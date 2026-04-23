@@ -1,6 +1,6 @@
 import { ipcMain, dialog } from 'electron'
 import { IPC } from '../shared/ipc-channels'
-import * as db from './mock-db'
+import * as db from './database'
 import type { IpcResponse, Campaign, Deal, Flight, ImportOptions, PerformanceData } from '../shared/types'
 import fs from 'fs'
 // xlsx: use require() to guarantee CJS export shape { readFile, utils, ... }
@@ -171,14 +171,6 @@ export function registerHandlers(): void {
     } catch (e) { return err(e) }
   })
 
-  // DB Backup
-  ipcMain.handle(IPC.DB.BACKUP, async () => {
-    await dialog.showMessageBox({
-      type: 'info',
-      title: 'Mock Database',
-      message: 'Currently using mock data. Database backup will be available after SQLite setup.',
-      buttons: ['OK']
-    })
-    return ok(true)
-  })
+  // DB Backup — no-op for now (data lives in userData/campaign-tracker.db)
+  ipcMain.handle(IPC.DB.BACKUP, async () => ok(true))
 }

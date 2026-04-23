@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button'
 import { RefreshCw, Trash2, CheckCircle, AlertCircle, Download, Database, BookOpen } from 'lucide-react'
 
 const GITHUB_REPO = 'liuqiaoyi/Campaign-Tracker'
-const CURRENT_VERSION = '0.1.0'   // bump this manually on each release
+const CURRENT_VERSION = '0.3.0'   // bump this manually on each release
 
 interface DataStatus {
   campaign: { id: number; name: string; client: string; status: string }

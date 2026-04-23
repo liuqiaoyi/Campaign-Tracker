@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerHandlers } from './ipc-handlers'
+import { initDatabase } from './database'
 
 function createWindow(): void {
   
@@ -34,9 +35,12 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.electron')
-  
+
+  // Init SQLite before anything else
+  await initDatabase()
+
   // Register IPC handlers
   registerHandlers()
 
