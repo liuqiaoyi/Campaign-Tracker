@@ -127,7 +127,9 @@ export default function Timeline() {
   const { campaigns, loading } = useCampaigns()
   const [selected, setSelected] = useState<Campaign | null>(null)
   const [filter, setFilter] = useState<'all' | 'active' | 'upcoming' | 'ended'>('all')
+  const [search, setSearch] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const barsRef = useRef<HTMLDivElement>(null)
 
   // Compute timeline range
   const { rangeStart, rangeEnd, totalDays } = useMemo(() => {
@@ -153,13 +155,36 @@ export default function Timeline() {
   // Filter campaigns
   const filtered = useMemo(() => {
     return campaigns.filter(c => {
-      if (filter === 'all') return true
-      if (filter === 'active') return c.status === 'Active'
-      if (filter === 'upcoming') return c.status === 'Draft' || parseDate(c.start_date) > today
-      if (filter === 'ended') return c.status === 'Ended'
-      return true
+      const matchStatus =
+        filter === 'all' ? true :
+        filter === 'active' ? c.status === 'Active' :
+        filter === 'upcoming' ? (c.status === 'Draft' || parseDate(c.start_date) > today) :
+        filter === 'ended' ? c.status === 'Ended' : true
+      const q = search.toLowerCase()
+      const matchSearch = !q || c.name.toLowerCase().includes(q) || c.client.toLowerCase().includes(q) || (c.agency ?? '').toLowerCase().includes(q)
+      return matchStatus && matchSearch
     })
-  }, [campaigns, filter, today])
+  }, [campaigns, filter, search, today])
+
+  // Month options for jump dropdown
+  const monthOptions = useMemo(() => {
+    const opts: { label: string; offset: number }[] = []
+    let cursor = new Date(rangeStart)
+    cursor.setDate(1)
+    while (cursor <= rangeEnd) {
+      opts.push({
+        label: cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        offset: diffDays(rangeStart, cursor) * DAY_W,
+      })
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
+    }
+    return opts
+  }, [rangeStart, rangeEnd])
+
+  const jumpToMonth = (offset: number) => {
+    scrollRef.current?.scrollTo({ left: offset, behavior: 'smooth' })
+    barsRef.current?.scrollTo({ left: offset, behavior: 'smooth' })
+  }
 
   // Scroll to today on load
   useEffect(() => {
@@ -188,6 +213,11 @@ export default function Timeline() {
     return result
   }, [rangeStart, rangeEnd, totalDays])
 
+  // Sync bar scroll → header scroll
+  const handleBarsScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (scrollRef.current) scrollRef.current.scrollLeft = e.currentTarget.scrollLeft
+  }
+
   if (loading) return <div className="p-8 text-muted-foreground text-sm">Loading...</div>
 
   const canvasW = totalDays * DAY_W
@@ -195,9 +225,32 @@ export default function Timeline() {
   return (
     <div className="flex flex-col h-[calc(100vh-64px)]">
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h1 className="text-2xl font-semibold">Timeline</h1>
-        <div className="flex gap-1 bg-muted rounded-lg p-1">
+      <div className="flex flex-wrap items-center gap-3 mb-4 flex-shrink-0">
+        <h1 className="text-2xl font-semibold mr-2">Timeline</h1>
+
+        {/* Search */}
+        <input
+          type="text"
+          placeholder="Search campaign / client..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="h-8 px-3 text-sm border rounded-md w-52 focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+
+        {/* Month jump */}
+        <select
+          className="h-8 px-2 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
+          defaultValue=""
+          onChange={e => jumpToMonth(Number(e.target.value))}
+        >
+          <option value="" disabled>Jump to month…</option>
+          {monthOptions.map(m => (
+            <option key={m.label} value={m.offset}>{m.label}</option>
+          ))}
+        </select>
+
+        {/* Status filter */}
+        <div className="flex gap-1 bg-muted rounded-lg p-1 ml-auto">
           {(['all', 'active', 'upcoming', 'ended'] as const).map(f => (
             <button
               key={f}
@@ -228,7 +281,12 @@ export default function Timeline() {
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Campaign</span>
               </div>
               {/* Date header - scrollable */}
-              <div ref={scrollRef} className="flex-1 overflow-x-auto" style={{ height: HEADER_H }}>
+              <div
+                ref={scrollRef}
+                className="flex-1 overflow-x-auto"
+                style={{ height: HEADER_H }}
+                onScroll={(e) => { if (barsRef.current) barsRef.current.scrollLeft = e.currentTarget.scrollLeft }}
+              >
                 <div className="relative" style={{ width: canvasW, height: HEADER_H }}>
                   {/* Month labels */}
                   {months.map((m, i) => (
@@ -288,10 +346,9 @@ export default function Timeline() {
 
               {/* Gantt bars (synced scroll with header) */}
               <div
+                ref={barsRef}
                 className="flex-1 overflow-x-auto"
-                onScroll={(e) => {
-                  if (scrollRef.current) scrollRef.current.scrollLeft = e.currentTarget.scrollLeft
-                }}
+                onScroll={handleBarsScroll}
               >
                 <div style={{ width: canvasW, position: 'relative' }}>
                   {/* Today vertical line */}

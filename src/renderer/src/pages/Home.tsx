@@ -30,8 +30,8 @@ export default function Home() {
     const paused  = campaigns.filter(c => c.status === 'Paused').length
     const draft   = campaigns.filter(c => c.status === 'Draft').length
     const ended   = campaigns.filter(c => c.status === 'Ended').length
-    const totalBudget = campaigns.reduce((s, c) => s + (c.budget ?? 0), 0)
-    return { active, paused, draft, ended, total: campaigns.length, totalBudget }
+    const activeBudget = campaigns.filter(c => c.status === 'Active').reduce((s, c) => s + (c.budget ?? 0), 0)
+    return { active, paused, draft, ended, total: campaigns.length, activeBudget }
   }, [campaigns])
 
   // Campaigns ending within 14 days
@@ -73,9 +73,9 @@ export default function Home() {
         <StatCard label="Total Campaigns" value={stats.total} sub={`${stats.draft} draft · ${stats.ended} ended`} />
         <StatCard label="Paused" value={stats.paused} color="text-amber-600" />
         <StatCard
-          label="Total Budget"
-          value={stats.totalBudget > 0 ? '$' + stats.totalBudget.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—'}
-          sub="across all campaigns"
+          label="Active Budget"
+          value={stats.activeBudget > 0 ? '$' + stats.activeBudget.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—'}
+          sub="across active campaigns"
         />
       </div>
 
