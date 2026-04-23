@@ -1,13 +1,42 @@
-import { Outlet } from 'react-router-dom'
+import { useState } from 'react'
+import { Outlet, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
+import { RefreshCw } from 'lucide-react'
 
 export default function Layout() {
+  const [spinning, setSpinning] = useState(false)
+  const navigate = useNavigate()
+
+  const handleRefresh = () => {
+    setSpinning(true)
+    // Re-navigate to current route to force remount
+    const path = window.location.hash.replace('#', '') || '/'
+    navigate('/___reload___', { replace: true })
+    setTimeout(() => {
+      navigate(path, { replace: true })
+      setSpinning(false)
+    }, 100)
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto p-6">
-        <Outlet />
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar */}
+        <div className="flex items-center justify-end px-6 py-2 border-b bg-background/80 flex-shrink-0">
+          <button
+            onClick={handleRefresh}
+            title="Refresh page data"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
+          >
+            <RefreshCw size={13} className={spinning ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+        <main className="flex-1 overflow-y-auto p-6">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }

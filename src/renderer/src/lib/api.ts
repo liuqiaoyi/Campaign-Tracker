@@ -11,8 +11,10 @@ declare global {
         delete: (id: number) => Promise<IpcResponse>
       }
       performance: {
-        query:  (campaign_id: number, from?: string, to?: string) => Promise<IpcResponse<PerformanceData[]>>
-        import: (opts: ImportOptions, rows: Record<string, unknown>[]) => Promise<IpcResponse<ImportResult>>
+        query:      (campaign_id: number, from?: string, to?: string) => Promise<IpcResponse<PerformanceData[]>>
+        import:     (opts: ImportOptions, rows: Record<string, unknown>[]) => Promise<IpcResponse<ImportResult>>
+        delete:     (campaign_id: number) => Promise<IpcResponse<number>>
+        dataStatus: () => Promise<IpcResponse<Array<{ campaign: { id: number; name: string; client: string; status: string }; hasData: boolean; rowCount: number }>>>
       }
       dialog: {
         openFile:  (filters: { name: string; extensions: string[] }[]) => Promise<IpcResponse<string | null>>

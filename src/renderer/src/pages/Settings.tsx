@@ -32,9 +32,11 @@ export default function Settings() {
 
   const loadDataStatus = async () => {
     setLoadingData(true)
-    const res = await (api.performance as any).dataStatus?.()
-    if (res?.success && res.data) {
-      setDataStatuses(res.data)
+    try {
+      const res = await api.performance?.dataStatus()
+      if (res?.success && res.data) setDataStatuses(res.data)
+    } catch (e) {
+      console.error('Failed to load data status:', e)
     }
     setLoadingData(false)
   }
@@ -42,7 +44,7 @@ export default function Settings() {
   const handleDeleteData = async (campaignId: number, campaignName: string) => {
     if (!window.confirm(`Delete all performance data for:\n"${campaignName}"?\n\nThis cannot be undone.`)) return
     setDeletingId(campaignId)
-    const res = await (api.performance as any).delete?.(campaignId)
+    const res = await api.performance?.delete(campaignId)
     if (res?.success) {
       setDeletedIds(prev => [...prev, campaignId])
       setDataStatuses(prev => prev.map(s =>
