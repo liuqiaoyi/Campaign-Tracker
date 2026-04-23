@@ -26,6 +26,7 @@ const api = {
   },
   app: {
     checkUpdate: () => ipcRenderer.invoke('app:check-update'),
+    getVersion:  () => ipcRenderer.invoke('app:version'),
   },
 }
 

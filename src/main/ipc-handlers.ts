@@ -1,4 +1,4 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, app } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import * as db from './database'
 import type { IpcResponse, Campaign, Deal, Flight, ImportOptions, PerformanceData } from '../shared/types'
@@ -174,6 +174,9 @@ export function registerHandlers(): void {
 
   // DB Backup — no-op for now (data lives in userData/campaign-tracker.db)
   ipcMain.handle(IPC.DB.BACKUP, async () => ok(true))
+
+  // Return the real app version from package.json (via Electron app.getVersion())
+  ipcMain.handle('app:version', () => ok(app.getVersion()))
 
   // Check for updates via GitHub Releases API (runs in main process — no CORS)
   ipcMain.handle('app:check-update', () => {

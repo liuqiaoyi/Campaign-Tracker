@@ -26,6 +26,7 @@ declare global {
       }
       app: {
         checkUpdate: () => Promise<IpcResponse<{ tag_name: string; html_url: string; name: string }>>
+        getVersion:  () => Promise<IpcResponse<string>>
       }
     }
   }

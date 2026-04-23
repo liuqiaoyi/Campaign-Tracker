@@ -5,7 +5,6 @@ import { Button } from '../components/ui/button'
 import { RefreshCw, Trash2, CheckCircle, AlertCircle, Download, Database, BookOpen } from 'lucide-react'
 
 const GITHUB_REPO = 'liuqiaoyi/Campaign-Tracker'
-const CURRENT_VERSION = '0.3.0'   // bump this manually on each release
 
 interface DataStatus {
   campaign: { id: number; name: string; client: string; status: string }
@@ -22,13 +21,17 @@ export default function Settings() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [deletedIds, setDeletedIds] = useState<number[]>([])
 
+  const [currentVersion, setCurrentVersion] = useState('')
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle')
   const [latestVersion, setLatestVersion] = useState('')
   const [releaseUrl, setReleaseUrl] = useState('')
   const [updateError, setUpdateError] = useState('')
 
-  // Load data status on mount
+  // Load app version and data status on mount
   useEffect(() => {
+    window.api.app.getVersion().then(res => {
+      if (res.success) setCurrentVersion(res.data)
+    })
     loadDataStatus()
   }, [])
 
@@ -65,7 +68,7 @@ export default function Settings() {
       const latest = (res.data.tag_name as string ?? '').replace(/^v/, '')
       setLatestVersion(latest)
       setReleaseUrl(res.data.html_url ?? `https://github.com/${GITHUB_REPO}/releases`)
-      setUpdateStatus(latest && latest !== CURRENT_VERSION ? 'available' : 'up-to-date')
+      setUpdateStatus(latest && latest !== currentVersion ? 'available' : 'up-to-date')
     } catch (e) {
       setUpdateError(String(e))
       setUpdateStatus('error')
@@ -223,7 +226,7 @@ export default function Settings() {
       <section className="border rounded-xl p-6 space-y-2 bg-white">
         <h2 className="font-semibold">About</h2>
         <div className="text-sm text-muted-foreground space-y-1">
-          <p>Campaign Tracker v{CURRENT_VERSION}</p>
+          <p>Campaign Tracker v{currentVersion}</p>
           <p>Author: Derrick Liu</p>
           <p>Built with Electron + React + TypeScript</p>
           <p>
