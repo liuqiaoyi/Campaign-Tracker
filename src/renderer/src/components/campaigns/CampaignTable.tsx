@@ -65,19 +65,49 @@ export default function CampaignTable({ campaigns, onEdit, onDelete, onDuplicate
                   </div>
                 </td>
               </tr>
-              {expanded.has(c.id) && c.deals && c.deals.length > 0 && (
-                <tr key={`${c.id}-deals`} className="border-b bg-muted/10">
-                  <td colSpan={8} className="px-8 py-2">
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Deals ({c.deals.length})</p>
-                    <div className="flex flex-wrap gap-2">
-                      {c.deals.map(d => (
-                        <div key={d.id} className="text-xs border rounded px-2 py-1 bg-background">
-                          <span className="font-medium">{d.deal_name || d.deal_id || 'Unnamed Deal'}</span>
-                          {d.deal_type && <span className="text-muted-foreground ml-1">({d.deal_type})</span>}
-                          {d.floor_price != null && <span className="text-muted-foreground ml-1">${d.floor_price} CPM</span>}
+              {expanded.has(c.id) && (
+                <tr key={`${c.id}-detail`} className="border-b bg-muted/10">
+                  <td colSpan={8} className="px-8 py-3 space-y-3">
+                    {/* Notes */}
+                    {c.notes && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-0.5">Notes</p>
+                        <p className="text-xs text-foreground whitespace-pre-wrap">{c.notes}</p>
+                      </div>
+                    )}
+                    {/* Flights */}
+                    {c.flights && c.flights.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Flights ({c.flights.length})</p>
+                        <div className="flex flex-wrap gap-2">
+                          {c.flights.map(f => (
+                            <div key={f.id} className="text-xs border rounded px-2 py-1 bg-background">
+                              <span className="font-medium">{f.flight_name || 'Unnamed Flight'}</span>
+                              <span className="text-muted-foreground ml-1">{formatDate(f.start_date)} – {formatDate(f.end_date)}</span>
+                              {f.budget > 0 && <span className="text-muted-foreground ml-1">${f.budget.toLocaleString()}</span>}
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    )}
+                    {/* Deals */}
+                    {c.deals && c.deals.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Deals ({c.deals.length})</p>
+                        <div className="flex flex-wrap gap-2">
+                          {c.deals.map(d => (
+                            <div key={d.id} className="text-xs border rounded px-2 py-1 bg-background">
+                              <span className="font-medium">{d.deal_name || d.deal_id || 'Unnamed Deal'}</span>
+                              {d.deal_type && <span className="text-muted-foreground ml-1">({d.deal_type})</span>}
+                              {d.floor_price != null && <span className="text-muted-foreground ml-1">${d.floor_price} CPM</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {!c.notes && (!c.flights || c.flights.length === 0) && (!c.deals || c.deals.length === 0) && (
+                      <p className="text-xs text-muted-foreground">No additional details.</p>
+                    )}
                   </td>
                 </tr>
               )}
