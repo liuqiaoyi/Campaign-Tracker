@@ -95,7 +95,11 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        onInteractOutside={e => e.preventDefault()}
+        onEscapeKeyDown={e => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{editTarget ? 'Edit Campaign' : 'New Campaign'}</DialogTitle>
         </DialogHeader>
