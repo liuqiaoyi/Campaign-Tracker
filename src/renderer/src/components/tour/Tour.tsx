@@ -9,7 +9,7 @@ interface Step {
   // CSS selector of the element to highlight (optional)
   target?: string
   // Which side to show the tooltip relative to the target
-  placement?: 'top' | 'bottom' | 'left' | 'right' | 'center'
+  placement?: 'top' | 'bottom' | 'bottom-left' | 'left' | 'right' | 'center'
   icon: string
 }
 
@@ -60,7 +60,7 @@ const STEPS: Step[] = [
     title: 'Refresh Button',
     description: 'The Refresh button in the top-right corner reloads the current page\'s data — useful after importing new data or making changes.',
     target: '[data-tour="refresh-btn"]',
-    placement: 'bottom',
+    placement: 'bottom-left',
   },
   {
     icon: '✅',
@@ -140,15 +140,19 @@ export function Tour({ visible, onEnd }: TourProps) {
       return { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 360 }
     }
     const gap = 16
+    const W = 300
     switch (current.placement) {
       case 'right':
-        return { position: 'fixed', top: rect.top + rect.height / 2, left: rect.left + rect.width + gap, transform: 'translateY(-50%)', width: 300 }
+        return { position: 'fixed', top: rect.top + rect.height / 2, left: rect.left + rect.width + gap, transform: 'translateY(-50%)', width: W }
       case 'left':
-        return { position: 'fixed', top: rect.top + rect.height / 2, left: rect.left - 300 - gap, transform: 'translateY(-50%)', width: 300 }
+        return { position: 'fixed', top: rect.top + rect.height / 2, left: rect.left - W - gap, transform: 'translateY(-50%)', width: W }
       case 'bottom':
-        return { position: 'fixed', top: rect.top + rect.height + gap, left: rect.left + rect.width / 2, transform: 'translateX(-50%)', width: 300 }
+        return { position: 'fixed', top: rect.top + rect.height + gap, left: rect.left + rect.width / 2, transform: 'translateX(-50%)', width: W }
+      case 'bottom-left':
+        // anchor to right edge of target, grow leftward — safe for top-right buttons
+        return { position: 'fixed', top: rect.top + rect.height + gap, right: window.innerWidth - (rect.left + rect.width), width: W }
       case 'top':
-        return { position: 'fixed', top: rect.top - gap, left: rect.left + rect.width / 2, transform: 'translate(-50%, -100%)', width: 300 }
+        return { position: 'fixed', top: rect.top - gap, left: rect.left + rect.width / 2, transform: 'translate(-50%, -100%)', width: W }
       default:
         return { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 360 }
     }
