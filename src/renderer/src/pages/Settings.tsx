@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { api } from '../lib/api'
 import { Button } from '../components/ui/button'
-import { RefreshCw, Trash2, CheckCircle, AlertCircle, Download, Database } from 'lucide-react'
+import { RefreshCw, Trash2, CheckCircle, AlertCircle, Download, Database, BookOpen } from 'lucide-react'
 
 const GITHUB_REPO = 'liuqiaoyi/Campaign-Tracker'
 const CURRENT_VERSION = '0.1.0'   // bump this manually on each release
@@ -15,6 +16,7 @@ interface DataStatus {
 type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'available' | 'error'
 
 export default function Settings() {
+  const { startTour } = useOutletContext<{ startTour: () => void }>()
   const [dataStatuses, setDataStatuses] = useState<DataStatus[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -202,6 +204,22 @@ export default function Settings() {
             <RefreshCw size={12} /> Refresh
           </Button>
         </div>
+      </section>
+
+      {/* ── Tour ── */}
+      <section className="border rounded-xl p-6 bg-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen size={18} className="text-purple-500" />
+            <h2 className="font-semibold">Tutorial</h2>
+          </div>
+          <Button onClick={() => { localStorage.removeItem('campaign_tracker_tour_done'); startTour() }} variant="outline" className="gap-2">
+            <BookOpen size={14} /> Restart Tour
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground mt-2">
+          Replay the onboarding tour to get a refresher on all the features.
+        </p>
       </section>
 
       {/* ── About ── */}

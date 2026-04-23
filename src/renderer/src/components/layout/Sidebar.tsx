@@ -3,12 +3,12 @@ import { Home, List, Calendar, Upload, BarChart2, Settings } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 const NAV_ITEMS = [
-  { to: '/',          label: 'Home',       icon: Home },
-  { to: '/campaigns', label: 'Campaigns',  icon: List },
-  { to: '/timeline',  label: 'Timeline',   icon: Calendar },
-  { to: '/import',    label: 'Import',     icon: Upload },
-  { to: '/dashboard', label: 'Dashboard',  icon: BarChart2 },
-  { to: '/settings',  label: 'Settings',   icon: Settings },
+  { to: '/',          label: 'Home',      icon: Home,     tour: 'nav-home' },
+  { to: '/campaigns', label: 'Campaigns', icon: List,     tour: 'nav-campaigns' },
+  { to: '/timeline',  label: 'Timeline',  icon: Calendar, tour: 'nav-timeline' },
+  { to: '/import',    label: 'Import',    icon: Upload,   tour: 'nav-import' },
+  { to: '/dashboard', label: 'Dashboard', icon: BarChart2,tour: 'nav-dashboard' },
+  { to: '/settings',  label: 'Settings',  icon: Settings, tour: 'nav-settings' },
 ]
 
 export default function Sidebar() {
@@ -19,11 +19,12 @@ export default function Sidebar() {
         <p className="text-xs text-muted-foreground">TTD Ad Operations</p>
       </div>
       <nav className="flex flex-col gap-1 px-2">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+        {NAV_ITEMS.map(({ to, label, icon: Icon, tour }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
+            data-tour={tour}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
