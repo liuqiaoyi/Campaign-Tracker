@@ -227,6 +227,7 @@ export default function Settings() {
         <h2 className="font-semibold">About</h2>
         <div className="text-sm text-muted-foreground space-y-1">
           <p>Campaign Tracker v{CURRENT_VERSION}</p>
+          <p>Author: Derrick Liu</p>
           <p>Built with Electron + React + TypeScript</p>
           <p>
             <button
