@@ -136,6 +136,14 @@ export function registerHandlers(): void {
     } catch (e) { return err(e) }
   })
 
+  ipcMain.handle('performance:delete', (_e, campaign_id: number) => {
+    try { return ok(db.deletePerformanceData(campaign_id)) } catch (e) { return err(e) }
+  })
+
+  ipcMain.handle('campaigns:data-status', () => {
+    try { return ok(db.listCampaignsWithDataStatus()) } catch (e) { return err(e) }
+  })
+
   // Dialog - open file
   ipcMain.handle(IPC.DIALOG.OPEN_FILE, async (_e, filters: Electron.FileFilter[]) => {
     const result = await dialog.showOpenDialog({ properties: ['openFile'], filters })

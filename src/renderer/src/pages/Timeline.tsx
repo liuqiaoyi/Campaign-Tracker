@@ -182,8 +182,8 @@ export default function Timeline() {
   }, [rangeStart, rangeEnd])
 
   const jumpToMonth = (offset: number) => {
-    scrollRef.current?.scrollTo({ left: offset, behavior: 'smooth' })
-    barsRef.current?.scrollTo({ left: offset, behavior: 'smooth' })
+    if (scrollRef.current) scrollRef.current.scrollLeft = offset
+    if (barsRef.current) barsRef.current.scrollLeft = offset
   }
 
   // Scroll to today on load
@@ -237,10 +237,10 @@ export default function Timeline() {
           className="h-8 px-3 text-sm border rounded-md w-52 focus:outline-none focus:ring-1 focus:ring-ring"
         />
 
-        {/* Month jump */}
+        {/* Month jump — controlled with value="" so every selection fires onChange */}
         <select
           className="h-8 px-2 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
-          defaultValue=""
+          value=""
           onChange={e => jumpToMonth(Number(e.target.value))}
         >
           <option value="" disabled>Jump to month…</option>

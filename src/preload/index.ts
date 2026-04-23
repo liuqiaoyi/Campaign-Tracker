@@ -11,8 +11,10 @@ const api = {
     delete: (id: number)                                 => ipcRenderer.invoke(IPC.CAMPAIGN.DELETE, id),
   },
   performance: {
-    query:  (campaign_id: number, from?: string, to?: string) => ipcRenderer.invoke(IPC.PERFORMANCE.QUERY, campaign_id, from, to),
-    import: (opts: unknown, rows: unknown)               => ipcRenderer.invoke(IPC.PERFORMANCE.IMPORT, opts, rows),
+    query:       (campaign_id: number, from?: string, to?: string) => ipcRenderer.invoke(IPC.PERFORMANCE.QUERY, campaign_id, from, to),
+    import:      (opts: unknown, rows: unknown)                    => ipcRenderer.invoke(IPC.PERFORMANCE.IMPORT, opts, rows),
+    delete:      (campaign_id: number)                             => ipcRenderer.invoke('performance:delete', campaign_id),
+    dataStatus:  ()                                                => ipcRenderer.invoke('campaigns:data-status'),
   },
   dialog: {
     openFile:  (filters: unknown)                        => ipcRenderer.invoke(IPC.DIALOG.OPEN_FILE, filters),
