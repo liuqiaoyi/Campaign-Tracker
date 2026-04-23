@@ -202,10 +202,10 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Reporting Columns (single-select, formerly Attribution Window) */}
+          {/* Attributions */}
           {convWindows.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Reporting Columns</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Attributions</p>
               {m.custom_conv > 0 && (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mb-4">
                   <KpiCard label="Custom CPA Conversions" value={num(m.custom_conv)} />
@@ -217,7 +217,7 @@ export default function Dashboard() {
               <div className="border rounded-lg overflow-hidden">
                 {/* Window selector */}
                 <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30 flex-wrap">
-                  <span className="text-xs text-muted-foreground font-medium mr-1">Window:</span>
+                  <span className="text-xs text-muted-foreground font-medium mr-1">Reporting Columns:</span>
                   {convWindows.map(w => (
                     <button
                       key={w}

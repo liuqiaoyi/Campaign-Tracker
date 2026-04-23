@@ -1,16 +1,61 @@
 {
   "name": "campaign-tracker",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "TTD Campaign tracking desktop application",
   "main": "out/main/index.js",
-  "author": "Derrick Liu",
+  "author": "Derrick Liu <derrick.liu@thetradedesk.com>",
   "private": true,
   "scripts": {
     "dev": "electron-vite dev",
     "prebuild": "electron-vite build",
     "build": "npm run prebuild && electron-builder",
     "build:win": "npm run prebuild && electron-builder --win",
+    "build:mac": "npm run prebuild && electron-builder --mac",
     "postinstall": "echo 'No native modules to rebuild'"
+  },
+  "build": {
+    "appId": "com.derrickliu.campaign-tracker",
+    "productName": "Campaign Tracker",
+    "copyright": "Copyright © 2026 Derrick Liu",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "!out/**/*.map"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.business"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "dmg": {
+      "title": "Campaign Tracker",
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "liuqiaoyi",
+      "repo": "Campaign-Tracker"
+    }
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
