@@ -27,6 +27,18 @@ export default function Campaigns() {
     setShowForm(true)
   }
 
+  const handleDuplicate = (c: Campaign) => {
+    // Open the form pre-filled with copied data so user can review before saving
+    setEditTarget({
+      ...c,
+      id: 0,                          // 0 signals "new" to the form
+      name: `Copy of ${c.name}`,
+      status: 'Draft',
+      created_at: '',
+    })
+    setShowForm(true)
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -41,7 +53,7 @@ export default function Campaigns() {
           <Button variant="outline" size="sm" onClick={refresh} className="mt-2">Retry</Button>
         </div>
       ) : (
-        <CampaignTable campaigns={campaigns} onEdit={handleEdit} onDelete={handleDelete} />
+        <CampaignTable campaigns={campaigns} onEdit={handleEdit} onDelete={handleDelete} onDuplicate={handleDuplicate} />
       )}
       <CampaignFormDialog open={showForm} onClose={() => setShowForm(false)} onSuccess={refresh} editTarget={editTarget} />
     </div>

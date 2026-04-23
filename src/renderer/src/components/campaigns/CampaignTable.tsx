@@ -2,7 +2,7 @@ import type { Campaign } from '../../../../shared/types'
 import { formatDate } from '../../lib/utils'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
-import { Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Pencil, Trash2, Copy, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -13,9 +13,10 @@ interface Props {
   campaigns: Campaign[]
   onEdit: (c: Campaign) => void
   onDelete: (id: number) => void
+  onDuplicate: (c: Campaign) => void
 }
 
-export default function CampaignTable({ campaigns, onEdit, onDelete }: Props) {
+export default function CampaignTable({ campaigns, onEdit, onDelete, onDuplicate }: Props) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
 
   const toggle = (id: number) => setExpanded(prev => {
@@ -40,7 +41,7 @@ export default function CampaignTable({ campaigns, onEdit, onDelete }: Props) {
             <th className="text-left px-3 py-2 font-medium">Dates</th>
             <th className="text-left px-3 py-2 font-medium">Status</th>
             <th className="text-left px-3 py-2 font-medium">Primary KPI</th>
-            <th className="w-20 px-3 py-2" />
+            <th className="w-28 px-3 py-2" />
           </tr>
         </thead>
         <tbody>
@@ -58,8 +59,9 @@ export default function CampaignTable({ campaigns, onEdit, onDelete }: Props) {
                 <td className="px-3 py-2 text-muted-foreground">{c.primary_kpi}</td>
                 <td className="px-3 py-2">
                   <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(c)}><Pencil size={13} /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => onDelete(c.id)}><Trash2 size={13} /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit" onClick={() => onEdit(c)}><Pencil size={13} /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" title="Duplicate" onClick={() => onDuplicate(c)}><Copy size={13} /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" title="Delete" onClick={() => onDelete(c.id)}><Trash2 size={13} /></Button>
                   </div>
                 </td>
               </tr>

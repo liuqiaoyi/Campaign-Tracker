@@ -83,8 +83,9 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
     try {
       if (!api.campaign) throw new Error('API not available')
       const { deals, flights, ...campaignData } = values
-      const result = editTarget
-        ? await api.campaign.update!(editTarget.id, campaignData as never, deals as never, flights as never)
+      const isEdit = editTarget && editTarget.id > 0
+      const result = isEdit
+        ? await api.campaign.update!(editTarget!.id, campaignData as never, deals as never, flights as never)
         : await api.campaign.create!(campaignData as never, deals as never, flights as never)
       if (result.success) { onSuccess(); onClose() }
       else alert(`Error: ${result.error}`)
@@ -101,7 +102,9 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
         onEscapeKeyDown={e => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>{editTarget ? 'Edit Campaign' : 'New Campaign'}</DialogTitle>
+          <DialogTitle>
+            {editTarget && editTarget.id > 0 ? 'Edit Campaign' : editTarget ? 'Duplicate Campaign' : 'New Campaign'}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
