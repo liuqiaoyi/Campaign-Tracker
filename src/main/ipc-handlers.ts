@@ -3,6 +3,7 @@ import { IPC } from '../shared/ipc-channels'
 import * as db from './database'
 import type { IpcResponse, Campaign, Deal, Flight, ImportOptions, PerformanceData } from '../shared/types'
 import fs from 'fs'
+import https from 'https'
 // xlsx: use require() to guarantee CJS export shape { readFile, utils, ... }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const XLSX = require('xlsx') as typeof import('xlsx')
@@ -173,4 +174,32 @@ export function registerHandlers(): void {
 
   // DB Backup — no-op for now (data lives in userData/campaign-tracker.db)
   ipcMain.handle(IPC.DB.BACKUP, async () => ok(true))
+
+  // Check for updates via GitHub Releases API (runs in main process — no CORS)
+  ipcMain.handle('app:check-update', () => {
+    return new Promise((resolve) => {
+      const options = {
+        hostname: 'api.github.com',
+        path: '/repos/liuqiaoyi/Campaign-Tracker/releases/latest',
+        headers: {
+          'User-Agent': 'Campaign-Tracker-App',
+          'Accept': 'application/vnd.github.v3+json',
+        },
+      }
+      const req = https.get(options, (res) => {
+        let body = ''
+        res.on('data', (chunk) => { body += chunk })
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body)
+            resolve(ok({ tag_name: data.tag_name, html_url: data.html_url, name: data.name }))
+          } catch (e) {
+            resolve(err(e))
+          }
+        })
+      })
+      req.on('error', (e) => resolve(err(e)))
+      req.setTimeout(8000, () => { req.destroy(); resolve(err('Request timed out')) })
+    })
+  })
 }

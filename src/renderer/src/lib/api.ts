@@ -24,6 +24,9 @@ declare global {
       db: {
         backup: () => Promise<IpcResponse<boolean>>
       }
+      app: {
+        checkUpdate: () => Promise<IpcResponse<{ tag_name: string; html_url: string; name: string }>>
+      }
     }
   }
 }
@@ -33,4 +36,5 @@ export const api = {
   get performance() { return window.api?.performance },
   get dialog() { return window.api?.dialog },
   get db() { return window.api?.db },
+  get app() { return window.api?.app },
 }

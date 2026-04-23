@@ -60,14 +60,11 @@ export default function Settings() {
     setUpdateStatus('checking')
     setUpdateError('')
     try {
-      const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-        headers: { Accept: 'application/vnd.github.v3+json' }
-      })
-      if (!res.ok) throw new Error(`GitHub API returned ${res.status}`)
-      const data = await res.json()
-      const latest = (data.tag_name as string ?? '').replace(/^v/, '')
+      const res = await window.api.app.checkUpdate()
+      if (!res.success) throw new Error(res.error)
+      const latest = (res.data.tag_name as string ?? '').replace(/^v/, '')
       setLatestVersion(latest)
-      setReleaseUrl(data.html_url ?? `https://github.com/${GITHUB_REPO}/releases`)
+      setReleaseUrl(res.data.html_url ?? `https://github.com/${GITHUB_REPO}/releases`)
       setUpdateStatus(latest && latest !== CURRENT_VERSION ? 'available' : 'up-to-date')
     } catch (e) {
       setUpdateError(String(e))

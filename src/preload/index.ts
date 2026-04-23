@@ -24,6 +24,9 @@ const api = {
   db: {
     backup: () => ipcRenderer.invoke(IPC.DB.BACKUP),
   },
+  app: {
+    checkUpdate: () => ipcRenderer.invoke('app:check-update'),
+  },
 }
 
 if (process.contextIsolated) {
