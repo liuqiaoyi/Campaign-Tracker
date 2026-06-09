@@ -67,6 +67,14 @@ export default function Settings() {
     setUpdateStatus('checking')
     setUpdateError('')
     try {
+      let version = currentVersion
+      if (!version) {
+        const versionRes = await window.api.app.getVersion()
+        if (versionRes.success) {
+          version = versionRes.data
+          setCurrentVersion(version)
+        }
+      }
       const res = await window.api.app.checkUpdate()
       if (!res.success) throw new Error(res.error)
       const latest = (res.data.tag_name as string ?? '').replace(/^v/, '')
@@ -74,7 +82,7 @@ export default function Settings() {
       setReleaseUrl(res.data.html_url ?? `https://github.com/${GITHUB_REPO}/releases`)
       setDownloadUrl(res.data.recommended_asset?.browser_download_url ?? '')
       setDownloadName(res.data.recommended_asset?.name ?? '')
-      setUpdateStatus(latest && latest !== currentVersion ? 'available' : 'up-to-date')
+      setUpdateStatus(latest && latest !== version ? 'available' : 'up-to-date')
     } catch (e) {
       setUpdateError(String(e))
       setUpdateStatus('error')

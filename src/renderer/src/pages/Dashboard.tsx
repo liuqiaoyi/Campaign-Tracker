@@ -93,10 +93,13 @@ export default function Dashboard() {
   useEffect(() => {
     if (!selectedId) return
     setLoading(true)
-    api.performance?.query(selectedId).then(res => {
-      setRows(res.data ?? [])
-      setLoading(false)
-    })
+    api.performance?.query(selectedId)
+      .then(res => setRows(res.data ?? []))
+      .catch(error => {
+        console.error('Failed to load performance data:', error)
+        setRows([])
+      })
+      .finally(() => setLoading(false))
     setDateFrom('')
     setDateTo('')
     setAdGroupFilter('all')
