@@ -10,6 +10,8 @@ import type { Campaign, Deal, Flight, PerformanceData, ImportOptions, ImportResu
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _db: any = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _SQL: any = null
 let _dbPath = ''
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -23,6 +25,10 @@ function getDb() {
 function save() {
   const data: Uint8Array = getDb().export()
   fs.writeFileSync(_dbPath, Buffer.from(data))
+}
+
+function timestampForFileName(): string {
+  return new Date().toISOString().replace(/[:.]/g, '-')
 }
 
 /** Run a statement that produces no result rows. */
@@ -145,18 +151,56 @@ export async function initDatabase(): Promise<void> {
     ? path.join(process.resourcesPath, 'sql-wasm.wasm')
     : path.join(__dirname, '../../node_modules/sql.js/dist/sql-wasm.wasm')
 
-  const SQL = await initSqlJs({ locateFile: () => wasmPath })
+  _SQL = await initSqlJs({ locateFile: () => wasmPath })
 
   _dbPath = path.join(app.getPath('userData'), 'campaign-tracker.db')
 
   if (fs.existsSync(_dbPath)) {
-    _db = new SQL.Database(fs.readFileSync(_dbPath))
+    _db = new _SQL.Database(fs.readFileSync(_dbPath))
   } else {
-    _db = new SQL.Database()
+    _db = new _SQL.Database()
   }
 
   createSchema()
   console.log(`[DB] SQLite ready at: ${_dbPath}`)
+}
+
+export function getDatabasePath(): string {
+  return _dbPath
+}
+
+export function backupDatabaseTo(destinationPath: string): string {
+  save()
+  fs.copyFileSync(_dbPath, destinationPath)
+  return destinationPath
+}
+
+export function restoreDatabaseFrom(sourcePath: string): { dbPath: string; safetyBackupPath: string } {
+  if (!_SQL) throw new Error('Database engine not initialized.')
+  if (!fs.existsSync(sourcePath)) throw new Error('Backup file does not exist.')
+
+  const candidateBytes = fs.readFileSync(sourcePath)
+  const candidate = new _SQL.Database(candidateBytes)
+  try {
+    // Basic validation: ensure this looks like a SQLite DB and can be read.
+    candidate.exec("SELECT name FROM sqlite_master WHERE type='table'")
+  } finally {
+    candidate.close()
+  }
+
+  save()
+  const safetyBackupPath = path.join(
+    path.dirname(_dbPath),
+    `campaign-tracker-before-restore-${timestampForFileName()}.db`
+  )
+  fs.copyFileSync(_dbPath, safetyBackupPath)
+
+  fs.copyFileSync(sourcePath, _dbPath)
+  _db?.close?.()
+  _db = new _SQL.Database(fs.readFileSync(_dbPath))
+  createSchema()
+
+  return { dbPath: _dbPath, safetyBackupPath }
 }
 
 // ── Campaigns ─────────────────────────────────────────────────────────────────

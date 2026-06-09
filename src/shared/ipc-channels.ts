@@ -22,5 +22,7 @@ export const IPC = {
   },
   DB: {
     BACKUP: 'db:backup',
+    RESTORE: 'db:restore',
+    OPEN_FOLDER: 'db:open-folder',
   },
 } as const

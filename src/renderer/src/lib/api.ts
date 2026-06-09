@@ -22,7 +22,9 @@ declare global {
         parseFile: (filePath: string) => Promise<IpcResponse<{ columns: string[]; rows: Record<string, unknown>[]; zero_impression_rows: number; total_rows: number }>>
       }
       db: {
-        backup: () => Promise<IpcResponse<boolean>>
+        backup:     () => Promise<IpcResponse<string | null>>
+        restore:    () => Promise<IpcResponse<{ dbPath: string; safetyBackupPath: string } | null>>
+        openFolder: () => Promise<IpcResponse<string>>
       }
       app: {
         checkUpdate: () => Promise<IpcResponse<{ tag_name: string; html_url: string; name: string }>>

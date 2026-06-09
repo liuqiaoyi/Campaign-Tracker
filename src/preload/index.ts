@@ -22,7 +22,9 @@ const api = {
     parseFile: (filePath: string)                        => ipcRenderer.invoke('dialog:parseFile', filePath),
   },
   db: {
-    backup: () => ipcRenderer.invoke(IPC.DB.BACKUP),
+    backup:     () => ipcRenderer.invoke(IPC.DB.BACKUP),
+    restore:    () => ipcRenderer.invoke(IPC.DB.RESTORE),
+    openFolder: () => ipcRenderer.invoke(IPC.DB.OPEN_FOLDER),
   },
   app: {
     checkUpdate: () => ipcRenderer.invoke('app:check-update'),

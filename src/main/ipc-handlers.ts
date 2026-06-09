@@ -1,9 +1,10 @@
-import { ipcMain, dialog, app } from 'electron'
+import { ipcMain, dialog, app, shell } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import * as db from './database'
 import type { IpcResponse, Campaign, Deal, Flight, ImportOptions, PerformanceData } from '../shared/types'
 import fs from 'fs'
 import https from 'https'
+import path from 'path'
 // xlsx: use require() to guarantee CJS export shape { readFile, utils, ... }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const XLSX = require('xlsx') as typeof import('xlsx')
@@ -172,8 +173,40 @@ export function registerHandlers(): void {
     } catch (e) { return err(e) }
   })
 
-  // DB Backup — no-op for now (data lives in userData/campaign-tracker.db)
-  ipcMain.handle(IPC.DB.BACKUP, async () => ok(true))
+  // DB Backup / Restore (data lives in userData/campaign-tracker.db)
+  ipcMain.handle(IPC.DB.BACKUP, async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const result = await dialog.showSaveDialog({
+        title: 'Backup Campaign Tracker Database',
+        defaultPath: `campaign-tracker-backup-${today}.db`,
+        filters: [{ name: 'SQLite Database', extensions: ['db'] }],
+      })
+      if (result.canceled || !result.filePath) return ok(null)
+      return ok(db.backupDatabaseTo(result.filePath))
+    } catch (e) { return err(e) }
+  })
+
+  ipcMain.handle(IPC.DB.RESTORE, async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        title: 'Restore Campaign Tracker Database',
+        properties: ['openFile'],
+        filters: [{ name: 'SQLite Database', extensions: ['db'] }],
+      })
+      if (result.canceled || result.filePaths.length === 0) return ok(null)
+      return ok(db.restoreDatabaseFrom(result.filePaths[0]))
+    } catch (e) { return err(e) }
+  })
+
+  ipcMain.handle(IPC.DB.OPEN_FOLDER, async () => {
+    try {
+      const folder = path.dirname(db.getDatabasePath())
+      const result = await shell.openPath(folder)
+      if (result) throw new Error(result)
+      return ok(folder)
+    } catch (e) { return err(e) }
+  })
 
   // Return the real app version from package.json (via Electron app.getVersion())
   ipcMain.handle('app:version', () => ok(app.getVersion()))
