@@ -25,6 +25,8 @@ export default function Settings() {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle')
   const [latestVersion, setLatestVersion] = useState('')
   const [releaseUrl, setReleaseUrl] = useState('')
+  const [downloadUrl, setDownloadUrl] = useState('')
+  const [downloadName, setDownloadName] = useState('')
   const [updateError, setUpdateError] = useState('')
   const [dbActionStatus, setDbActionStatus] = useState('')
   const [dbActionError, setDbActionError] = useState('')
@@ -70,6 +72,8 @@ export default function Settings() {
       const latest = (res.data.tag_name as string ?? '').replace(/^v/, '')
       setLatestVersion(latest)
       setReleaseUrl(res.data.html_url ?? `https://github.com/${GITHUB_REPO}/releases`)
+      setDownloadUrl(res.data.recommended_asset?.browser_download_url ?? '')
+      setDownloadName(res.data.recommended_asset?.name ?? '')
       setUpdateStatus(latest && latest !== currentVersion ? 'available' : 'up-to-date')
     } catch (e) {
       setUpdateError(String(e))
@@ -172,11 +176,16 @@ export default function Settings() {
               New version available: <span className="font-mono font-semibold">v{latestVersion}</span>
             </div>
             <div className="flex gap-2">
-              <Button onClick={() => window.open(releaseUrl, '_blank')} className="gap-2">
-                <Download size={14} /> Download v{latestVersion}
+              <Button onClick={() => window.open(downloadUrl || releaseUrl, '_blank')} className="gap-2">
+                <Download size={14} /> {downloadUrl ? 'Download Installer' : `Download v${latestVersion}`}
               </Button>
               <Button onClick={checkForUpdates} variant="ghost" size="sm">Recheck</Button>
             </div>
+            {downloadName && (
+              <p className="text-xs text-muted-foreground">
+                Recommended for this device: <span className="font-mono">{downloadName}</span>
+              </p>
+            )}
           </div>
         )}
 

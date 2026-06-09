@@ -56,6 +56,67 @@ const COLUMN_MAP: Record<string, keyof PerformanceData> = {
   'Advertiser Cost (Adv Currency)': 'advertiser_cost_adv_currency',
 }
 
+const REQUIRED_IMPORT_FIELDS: Array<keyof PerformanceData> = ['date', 'impressions']
+const FIELD_LABELS: Partial<Record<keyof PerformanceData, string>> = {
+  date: 'Date',
+  impressions: 'Impressions',
+  advertiser_cost_usd: 'Advertiser Cost (USD)',
+  clicks: 'Clicks',
+  ad_group: 'Ad Group',
+  ttd_campaign_name: 'Campaign',
+}
+const NORMALIZED_COLUMN_MAP = Object.fromEntries(
+  Object.entries(COLUMN_MAP).map(([column, field]) => [normalizeColumnName(column), field])
+) as Record<string, keyof PerformanceData>
+
+function normalizeColumnName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[\s_\-()/$]+/g, '')
+    .replace(/[^a-z0-9]/g, '')
+}
+
+function getImportMapping(columns: string[]) {
+  const mapped: Array<{ source: string; field: keyof PerformanceData; label: string }> = []
+  const seen = new Set<keyof PerformanceData>()
+  for (const source of columns) {
+    const field = NORMALIZED_COLUMN_MAP[normalizeColumnName(source)]
+    if (!field || seen.has(field)) continue
+    seen.add(field)
+    mapped.push({ source, field, label: FIELD_LABELS[field] ?? String(field) })
+  }
+  const missingRequired = REQUIRED_IMPORT_FIELDS
+    .filter(field => !seen.has(field))
+    .map(field => FIELD_LABELS[field] ?? String(field))
+  return { mapped, missingRequired }
+}
+
+function getMappedValue(raw: Record<string, unknown>, field: keyof PerformanceData): unknown {
+  for (const [source, value] of Object.entries(raw)) {
+    if (NORMALIZED_COLUMN_MAP[normalizeColumnName(source)] === field) return value
+  }
+  return undefined
+}
+
+interface GitHubReleaseAsset {
+  name: string
+  browser_download_url: string
+}
+
+function pickPlatformAsset(assets: GitHubReleaseAsset[]): GitHubReleaseAsset | null {
+  const platform = process.platform
+  const arch = process.arch
+  if (platform === 'win32') {
+    return assets.find(a => /\.exe$/i.test(a.name)) ?? null
+  }
+  if (platform === 'darwin') {
+    const dmgAssets = assets.filter(a => /\.dmg$/i.test(a.name))
+    if (arch === 'arm64') return dmgAssets.find(a => /arm64/i.test(a.name)) ?? dmgAssets[0] ?? null
+    return dmgAssets.find(a => !/arm64/i.test(a.name)) ?? dmgAssets[0] ?? null
+  }
+  return null
+}
+
 function parseExcelDate(val: string | number): string {
   if (typeof val === 'number') {
     // Excel serial date to JS date
@@ -67,8 +128,8 @@ function parseExcelDate(val: string | number): string {
 
 function mapRow(raw: Record<string, unknown>, campaignId: number): PerformanceData {
   const row: Partial<PerformanceData> = { campaign_id: campaignId, id: 0 }
-  for (const [excelCol, field] of Object.entries(COLUMN_MAP)) {
-    const val = raw[excelCol]
+  for (const field of Object.values(COLUMN_MAP)) {
+    const val = getMappedValue(raw, field)
     if (val === undefined || val === null || val === '') continue
     if (field === 'date') {
       (row as Record<string, unknown>)[field] = parseExcelDate(val as string | number)
@@ -133,6 +194,11 @@ export function registerHandlers(): void {
 
   ipcMain.handle(IPC.PERFORMANCE.IMPORT, (_e, opts: ImportOptions, rawRows: Record<string, unknown>[]) => {
     try {
+      const columns = rawRows.length > 0 ? Object.keys(rawRows[0]) : []
+      const mapping = getImportMapping(columns)
+      if (mapping.missingRequired.length > 0) {
+        throw new Error(`Missing required columns: ${mapping.missingRequired.join(', ')}`)
+      }
       const mapped = rawRows.map(r => mapRow(r, opts.campaign_id))
       return ok(db.importPerformance(opts, mapped))
     } catch (e) { return err(e) }
@@ -168,8 +234,16 @@ export function registerHandlers(): void {
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
       const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { raw: true })
       const columns = rows.length > 0 ? Object.keys(rows[0]) : []
-      const zero_impression_rows = rows.filter((r: Record<string, unknown>) => (Number(r['Impressions']) || 0) === 0).length
-      return ok({ columns, rows, zero_impression_rows, total_rows: rows.length })
+      const mapping = getImportMapping(columns)
+      const zero_impression_rows = rows.filter((r: Record<string, unknown>) => (Number(getMappedValue(r, 'impressions')) || 0) === 0).length
+      return ok({
+        columns,
+        rows,
+        zero_impression_rows,
+        total_rows: rows.length,
+        mapped_columns: mapping.mapped,
+        missing_required_columns: mapping.missingRequired,
+      })
     } catch (e) { return err(e) }
   })
 
@@ -228,7 +302,19 @@ export function registerHandlers(): void {
         res.on('end', () => {
           try {
             const data = JSON.parse(body)
-            resolve(ok({ tag_name: data.tag_name, html_url: data.html_url, name: data.name }))
+            const assets = (data.assets ?? []).map((a: GitHubReleaseAsset) => ({
+              name: a.name,
+              browser_download_url: a.browser_download_url,
+            }))
+            resolve(ok({
+              tag_name: data.tag_name,
+              html_url: data.html_url,
+              name: data.name,
+              assets,
+              recommended_asset: pickPlatformAsset(assets),
+              platform: process.platform,
+              arch: process.arch,
+            }))
           } catch (e) {
             resolve(err(e))
           }

@@ -19,7 +19,14 @@ declare global {
       dialog: {
         openFile:  (filters: { name: string; extensions: string[] }[]) => Promise<IpcResponse<string | null>>
         saveFile:  (name: string, content: string) => Promise<IpcResponse<boolean>>
-        parseFile: (filePath: string) => Promise<IpcResponse<{ columns: string[]; rows: Record<string, unknown>[]; zero_impression_rows: number; total_rows: number }>>
+        parseFile: (filePath: string) => Promise<IpcResponse<{
+          columns: string[]
+          rows: Record<string, unknown>[]
+          zero_impression_rows: number
+          total_rows: number
+          mapped_columns: Array<{ source: string; field: string; label: string }>
+          missing_required_columns: string[]
+        }>>
       }
       db: {
         backup:     () => Promise<IpcResponse<string | null>>
@@ -27,7 +34,15 @@ declare global {
         openFolder: () => Promise<IpcResponse<string>>
       }
       app: {
-        checkUpdate: () => Promise<IpcResponse<{ tag_name: string; html_url: string; name: string }>>
+        checkUpdate: () => Promise<IpcResponse<{
+          tag_name: string
+          html_url: string
+          name: string
+          assets: Array<{ name: string; browser_download_url: string }>
+          recommended_asset: { name: string; browser_download_url: string } | null
+          platform: string
+          arch: string
+        }>>
         getVersion:  () => Promise<IpcResponse<string>>
       }
     }

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { api } from '../lib/api'
 import { useCampaigns } from '../hooks/useCampaigns'
 import type { PerformanceData } from '../../../shared/types'
+import { Button } from '../components/ui/button'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend
@@ -75,6 +76,12 @@ export default function Dashboard() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [rows, setRows] = useState<PerformanceData[]>([])
   const [loading, setLoading] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [adGroupFilter, setAdGroupFilter] = useState('all')
+  const [publisherFilter, setPublisherFilter] = useState('all')
+  const [mediaTypeFilter, setMediaTypeFilter] = useState('all')
+  const [marketTypeFilter, setMarketTypeFilter] = useState('all')
 
   // Reporting Column single-select
   const [activeConv, setActiveConv] = useState('01')
@@ -90,14 +97,50 @@ export default function Dashboard() {
       setRows(res.data ?? [])
       setLoading(false)
     })
+    setDateFrom('')
+    setDateTo('')
+    setAdGroupFilter('all')
+    setPublisherFilter('all')
+    setMediaTypeFilter('all')
+    setMarketTypeFilter('all')
   }, [selectedId])
 
-  const m = useMemo(() => rows.length > 0 ? calcMetrics(rows) : null, [rows])
+  const filterOptions = useMemo(() => {
+    const unique = (getter: (r: PerformanceData) => string | undefined) =>
+      Array.from(new Set(rows.map(getter).filter(Boolean) as string[])).sort()
+    return {
+      adGroups: unique(r => r.ad_group),
+      publishers: unique(r => r.publisher_name),
+      mediaTypes: unique(r => r.media_type),
+      marketTypes: unique(r => r.market_type),
+    }
+  }, [rows])
+
+  const filteredRows = useMemo(() => rows.filter(r => {
+    if (dateFrom && r.date < dateFrom) return false
+    if (dateTo && r.date > dateTo) return false
+    if (adGroupFilter !== 'all' && r.ad_group !== adGroupFilter) return false
+    if (publisherFilter !== 'all' && r.publisher_name !== publisherFilter) return false
+    if (mediaTypeFilter !== 'all' && r.media_type !== mediaTypeFilter) return false
+    if (marketTypeFilter !== 'all' && r.market_type !== marketTypeFilter) return false
+    return true
+  }), [rows, dateFrom, dateTo, adGroupFilter, publisherFilter, mediaTypeFilter, marketTypeFilter])
+
+  const resetFilters = () => {
+    setDateFrom('')
+    setDateTo('')
+    setAdGroupFilter('all')
+    setPublisherFilter('all')
+    setMediaTypeFilter('all')
+    setMarketTypeFilter('all')
+  }
+
+  const m = useMemo(() => filteredRows.length > 0 ? calcMetrics(filteredRows) : null, [filteredRows])
 
   // Daily trend data — includes all metrics
   const dailyData = useMemo(() => {
     const byDate: Record<string, Record<string, number> & { date: string }> = {}
-    rows.filter(r => r.impressions > 0).forEach(r => {
+    filteredRows.filter(r => r.impressions > 0).forEach(r => {
       if (!byDate[r.date]) byDate[r.date] = {
         date: r.date, impressions: 0, cost: 0, starts: 0, completes: 0,
         clicks: 0, reach_hh: 0, reach_p: 0,
@@ -116,12 +159,12 @@ export default function Dashboard() {
       ctr: safe(d.clicks, d.impressions),
       cpm: safe(d.cost, d.impressions) * 1000,
     }))
-  }, [rows])
+  }, [filteredRows])
 
   // Ad Group breakdown
   const adGroupData = useMemo(() => {
     const byAg: Record<string, PerformanceData[]> = {}
-    rows.forEach(r => {
+    filteredRows.forEach(r => {
       const k = r.ad_group || 'Unknown'
       if (!byAg[k]) byAg[k] = []
       byAg[k].push(r)
@@ -130,7 +173,7 @@ export default function Dashboard() {
       const m = calcMetrics(agRows)
       return { ad_group: ag, ...m }
     }).sort((a, b) => b.imp - a.imp)
-  }, [rows])
+  }, [filteredRows])
 
   const convWindows = m ? Object.keys(m.convTotals).sort() : []
 
@@ -173,8 +216,65 @@ export default function Dashboard() {
         </div>
       )}
 
-      {selectedId && !loading && m && rows.length > 0 && (
+      {selectedId && !loading && rows.length > 0 && (
         <div className="space-y-6">
+          {/* Filters */}
+          <div className="border rounded-lg p-4 bg-white space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Filters</p>
+              <Button variant="ghost" size="sm" onClick={resetFilters}>Reset</Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <label className="text-xs text-muted-foreground">From</label>
+                <input className={selectClass + ' w-full mt-1'} type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">To</label>
+                <input className={selectClass + ' w-full mt-1'} type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Ad Group</label>
+                <select className={selectClass + ' w-full mt-1'} value={adGroupFilter} onChange={e => setAdGroupFilter(e.target.value)}>
+                  <option value="all">All ad groups</option>
+                  {filterOptions.adGroups.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Publisher</label>
+                <select className={selectClass + ' w-full mt-1'} value={publisherFilter} onChange={e => setPublisherFilter(e.target.value)}>
+                  <option value="all">All publishers</option>
+                  {filterOptions.publishers.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Media Type</label>
+                <select className={selectClass + ' w-full mt-1'} value={mediaTypeFilter} onChange={e => setMediaTypeFilter(e.target.value)}>
+                  <option value="all">All media types</option>
+                  {filterOptions.mediaTypes.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Market Type</label>
+                <select className={selectClass + ' w-full mt-1'} value={marketTypeFilter} onChange={e => setMarketTypeFilter(e.target.value)}>
+                  <option value="all">All market types</option>
+                  {filterOptions.marketTypes.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Showing {filteredRows.length.toLocaleString()} of {rows.length.toLocaleString()} rows
+            </p>
+          </div>
+
+          {!m && (
+            <div className="border rounded-lg p-8 text-center text-muted-foreground">
+              No rows match the current filters.
+            </div>
+          )}
+
+          {m && (
+            <>
 
           {/* Delivery KPIs */}
           <div>
@@ -390,6 +490,8 @@ export default function Dashboard() {
                 </table>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       )}

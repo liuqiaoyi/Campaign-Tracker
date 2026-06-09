@@ -11,6 +11,8 @@ interface ParsedFile {
   total_rows: number
   zero_impression_rows: number
   rows: Record<string, unknown>[]
+  mapped_columns?: Array<{ source: string; field: string; label: string }>
+  missing_required_columns?: string[]
 }
 
 interface ImportResult {
@@ -79,6 +81,9 @@ export default function Import() {
     setResult(null)
     setErrorMsg('')
   }
+
+  const missingColumns = parsed?.missing_required_columns ?? []
+  const canImport = missingColumns.length === 0
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -173,8 +178,38 @@ export default function Import() {
             </div>
           </div>
 
+          {/* Column mapping preview */}
+          <div className="border rounded-md p-4 space-y-3">
+            <div>
+              <p className="text-sm font-medium">Column Mapping</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                The importer matched these report columns automatically. Column names are matched case-insensitively and tolerate extra spaces.
+              </p>
+            </div>
+            {parsed.mapped_columns && parsed.mapped_columns.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {parsed.mapped_columns.map(col => (
+                  <div key={`${col.field}-${col.source}`} className="text-xs border rounded-md px-3 py-2 bg-white">
+                    <p className="font-medium">{col.label}</p>
+                    <p className="text-muted-foreground truncate" title={col.source}>{col.source}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
+                No known performance columns were detected.
+              </p>
+            )}
+            {missingColumns.length > 0 && (
+              <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                <XCircle size={14} className="mt-0.5 flex-shrink-0" />
+                <span>Missing required columns: {missingColumns.join(', ')}</span>
+              </div>
+            )}
+          </div>
+
           {/* Zero Impression Decision */}
-          {parsed.zero_impression_rows > 0 && (
+          {canImport && parsed.zero_impression_rows > 0 && (
             <div className="border border-orange-200 bg-orange-50 rounded-md p-4 space-y-3">
               <div className="flex items-start gap-2">
                 <AlertTriangle size={16} className="text-orange-500 mt-0.5 flex-shrink-0" />
@@ -206,7 +241,7 @@ export default function Import() {
             </div>
           )}
 
-          {parsed.zero_impression_rows === 0 && (
+          {canImport && parsed.zero_impression_rows === 0 && (
             <Button onClick={() => handleImport(false)} className="w-full">
               Import {parsed.total_rows} rows
             </Button>
