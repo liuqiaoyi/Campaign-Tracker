@@ -280,8 +280,9 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
   }
 
   const handleAddLine = () => {
-    const lines = form.getValues('lines')
-    lineArray.append(cloneLineForAppend(lines?.[lines.length - 1]))
+    const lastIndex = Math.max(0, lineArray.fields.length - 1)
+    const previousLine = form.getValues(`lines.${lastIndex}`)
+    lineArray.append(cloneLineForAppend(previousLine))
     setTimeout(() => linesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 0)
   }
 
@@ -355,7 +356,7 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
             ))}
             <div ref={linesEndRef} className="flex justify-center pt-1">
               <Button type="button" variant="outline" size="sm" onClick={handleAddLine}>
-                <Plus size={13} className="mr-1" /> Add Another Line
+                <Plus size={13} className="mr-1" /> Add Line from Previous
               </Button>
             </div>
           </div>
