@@ -90,6 +90,17 @@ function legacyCampaignToLine(campaign: Campaign): CampaignFormValues['lines'][n
   }
 }
 
+function cloneLineForAppend(line?: CampaignFormValues['lines'][number]): CampaignFormValues['lines'][number] {
+  if (!line) return emptyLine()
+  return {
+    ...line,
+    // Keep planning inputs, but avoid accidentally reusing the same platform campaign ID.
+    ttd_campaign_id: '',
+    flights: line.flights?.map(f => ({ ...f })) ?? [],
+    deals: line.deals?.map(d => ({ ...d })) ?? [],
+  }
+}
+
 function LineFields({ form, index, onRemove }: { form: ReturnType<typeof useForm<CampaignFormValues>>; index: number; onRemove: () => void }) {
   const flightArray = useFieldArray({ control: form.control, name: `lines.${index}.flights` })
   const dealArray = useFieldArray({ control: form.control, name: `lines.${index}.deals` })
@@ -267,6 +278,11 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
     }
   }
 
+  const handleAddLine = () => {
+    const lines = form.getValues('lines')
+    lineArray.append(cloneLineForAppend(lines?.[lines.length - 1]))
+  }
+
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent
@@ -322,8 +338,8 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Campaign Lines</p>
-              <Button type="button" variant="outline" size="sm" onClick={() => lineArray.append(emptyLine())}>
-                <Plus size={13} className="mr-1" /> Add Line
+              <Button type="button" variant="outline" size="sm" onClick={handleAddLine}>
+                <Plus size={13} className="mr-1" /> Add Line from Previous
               </Button>
             </div>
             {errors.lines?.message && <p className="text-xs text-red-600">{errors.lines.message}</p>}
