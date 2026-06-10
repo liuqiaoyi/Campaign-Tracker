@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { campaignSchema, type CampaignFormValues } from '../../lib/schemas'
@@ -239,6 +239,7 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
 
   const { register, handleSubmit, reset, formState: { errors } } = form
   const lineArray = useFieldArray({ control: form.control, name: 'lines' })
+  const linesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -281,6 +282,7 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
   const handleAddLine = () => {
     const lines = form.getValues('lines')
     lineArray.append(cloneLineForAppend(lines?.[lines.length - 1]))
+    setTimeout(() => linesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 0)
   }
 
   return (
@@ -351,6 +353,11 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
                 onRemove={() => lineArray.fields.length > 1 ? lineArray.remove(index) : undefined}
               />
             ))}
+            <div ref={linesEndRef} className="flex justify-center pt-1">
+              <Button type="button" variant="outline" size="sm" onClick={handleAddLine}>
+                <Plus size={13} className="mr-1" /> Add Another Line
+              </Button>
+            </div>
           </div>
 
           <DialogFooter>
