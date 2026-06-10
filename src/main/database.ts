@@ -315,7 +315,7 @@ function loadCampaign(id: number): Campaign | undefined {
     ttd_campaign_id: firstLine?.ttd_campaign_id,
     start_date: firstLine?.start_date,
     end_date: firstLine?.end_date,
-    type: lines.map(l => l.channel).filter(Boolean).join(', '),
+    type: Array.from(new Set(lines.map(l => l.channel).filter(Boolean))).join(', '),
     primary_kpi: firstLine?.primary_kpi,
     secondary_kpi: firstLine?.secondary_kpi,
     budget: lines.reduce((sum, line) => sum + (Number(line.budget) || 0), 0),

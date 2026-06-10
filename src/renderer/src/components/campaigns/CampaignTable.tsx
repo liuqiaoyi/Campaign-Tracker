@@ -10,7 +10,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
 }
 
 function splitAdTypes(type?: string): string[] {
-  return (type ?? '').split(',').map(t => t.trim()).filter(Boolean)
+  return Array.from(new Set((type ?? '').split(',').map(t => t.trim()).filter(Boolean)))
 }
 
 interface Props {

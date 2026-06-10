@@ -11,7 +11,7 @@ const selectClass = "flex h-9 rounded-md border border-input bg-transparent px-3
 type SortKey = 'created_desc' | 'start_asc' | 'start_desc' | 'end_asc' | 'end_desc' | 'budget_desc' | 'budget_asc'
 
 function splitAdTypes(type?: string): string[] {
-  return (type ?? '').split(',').map(t => t.trim()).filter(Boolean)
+  return Array.from(new Set((type ?? '').split(',').map(t => t.trim()).filter(Boolean)))
 }
 
 function firstDate(c: Campaign, key: 'start_date' | 'end_date'): string {
