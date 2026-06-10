@@ -22,11 +22,14 @@ export const campaignSchema = z.object({
   ttd_campaign_id:  z.string().optional(),
   start_date:       z.string().min(1, 'Start date is required'),
   end_date:         z.string().min(1, 'End date is required'),
-  type:             z.enum(['CTV', 'Display', 'OTT', 'Audio', 'DOOH']),
+  type:             z.string().min(1, 'Select at least one ad type'),
   agency:           z.string().optional(),
   client:           z.string().min(1, 'Client is required'),
   primary_kpi:      z.enum(['CTR', 'VCR', 'Reach', 'ROAS', 'CPA', 'CPM', 'Viewability']),
-  secondary_kpi:    z.enum(['CTR', 'VCR', 'Reach', 'ROAS', 'CPA', 'CPM', 'Viewability']).optional(),
+  secondary_kpi:    z.preprocess(
+    v => v === '' ? undefined : v,
+    z.enum(['CTR', 'VCR', 'Reach', 'ROAS', 'CPA', 'CPM', 'Viewability']).optional()
+  ),
   budget:           z.coerce.number().optional(),
   status:           z.enum(['Draft', 'Active', 'Paused', 'Ended']),
   notes:            z.string().optional(),

@@ -1,4 +1,4 @@
-export type AdType = 'CTV' | 'Display' | 'OTT' | 'Audio' | 'DOOH'
+export type AdType = 'CTV' | 'Display' | 'Video' | 'High Impact' | 'OTT' | 'Audio' | 'DOOH'
 export type KpiType = 'CTR' | 'VCR' | 'Reach' | 'ROAS' | 'CPA' | 'CPM' | 'Viewability'
 export type CampaignStatus = 'Draft' | 'Active' | 'Paused' | 'Ended'
 export type DealType = 'PMP' | 'PG' | 'Open'
@@ -30,7 +30,7 @@ export interface Campaign {
   ttd_campaign_id?: string        // TTD平台的Campaign ID，用于关联import数据
   start_date: string
   end_date: string
-  type: AdType
+  type: string
   agency?: string
   client: string
   primary_kpi: KpiType

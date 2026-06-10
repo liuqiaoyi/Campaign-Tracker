@@ -10,6 +10,10 @@ import { Plus, Search } from 'lucide-react'
 const selectClass = "flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 type SortKey = 'created_desc' | 'start_asc' | 'start_desc' | 'end_asc' | 'end_desc' | 'budget_desc' | 'budget_asc'
 
+function splitAdTypes(type: string): string[] {
+  return type.split(',').map(t => t.trim()).filter(Boolean)
+}
+
 export default function Campaigns() {
   const { campaigns, loading, error, refresh, deleteCampaign } = useCampaigns()
   const [editTarget, setEditTarget] = useState<Campaign | null>(null)
@@ -20,7 +24,7 @@ export default function Campaigns() {
   const [sortBy, setSortBy] = useState<SortKey>('created_desc')
 
   const statusOptions = useMemo(() => Array.from(new Set(campaigns.map(c => c.status))).sort(), [campaigns])
-  const typeOptions = useMemo(() => Array.from(new Set(campaigns.map(c => c.type))).sort(), [campaigns])
+  const typeOptions = useMemo(() => Array.from(new Set(campaigns.flatMap(c => splitAdTypes(c.type)))).sort(), [campaigns])
 
   const filteredCampaigns = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -30,7 +34,7 @@ export default function Campaigns() {
           c.name, c.client, c.agency, c.ttd_campaign_id, c.primary_kpi, c.secondary_kpi,
         ].some(v => String(v ?? '').toLowerCase().includes(q))
         const matchesStatus = statusFilter === 'all' || c.status === statusFilter
-        const matchesType = typeFilter === 'all' || c.type === typeFilter
+        const matchesType = typeFilter === 'all' || splitAdTypes(c.type).includes(typeFilter)
         return matchesSearch && matchesStatus && matchesType
       })
       .sort((a, b) => {

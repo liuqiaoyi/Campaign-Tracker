@@ -20,6 +20,7 @@ interface Props {
 }
 
 const KPI_OPTIONS = ['CTR', 'VCR', 'Reach', 'ROAS', 'CPA', 'CPM', 'Viewability']
+const AD_TYPE_OPTIONS = ['CTV', 'Display', 'Video', 'High Impact', 'OTT', 'Audio', 'DOOH']
 const selectClass = "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mt-1"
 
 export default function CampaignFormDialog({ open, onClose, onSuccess, editTarget }: Props) {
@@ -34,7 +35,15 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
     },
   })
 
-  const { register, handleSubmit, reset, formState: { errors } } = form
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = form
+  const selectedAdTypes = (watch('type') || '').split(',').map(t => t.trim()).filter(Boolean)
+
+  const toggleAdType = (type: string) => {
+    const next = selectedAdTypes.includes(type)
+      ? selectedAdTypes.filter(t => t !== type)
+      : [...selectedAdTypes, type]
+    setValue('type', next.join(', '), { shouldDirty: true, shouldValidate: true })
+  }
 
   useEffect(() => {
     if (!open) return
@@ -136,13 +145,20 @@ export default function CampaignFormDialog({ open, onClose, onSuccess, editTarge
 
               <div>
                 <Label>Ad Type *</Label>
-                <select {...register('type')} className={selectClass}>
-                  <option value="CTV">CTV</option>
-                  <option value="Display">Display</option>
-                  <option value="OTT">OTT</option>
-                  <option value="Audio">Audio</option>
-                  <option value="DOOH">DOOH</option>
-                </select>
+                <input type="hidden" {...register('type')} />
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {AD_TYPE_OPTIONS.map(type => (
+                    <label key={type} className="flex items-center gap-2 text-sm border rounded-md px-3 py-2 cursor-pointer hover:bg-muted/40">
+                      <input
+                        type="checkbox"
+                        checked={selectedAdTypes.includes(type)}
+                        onChange={() => toggleAdType(type)}
+                      />
+                      {type}
+                    </label>
+                  ))}
+                </div>
+                {errors.type && <p className="text-xs text-red-600 mt-1">{errors.type.message}</p>}
               </div>
               <div>
                 <Label>Status *</Label>

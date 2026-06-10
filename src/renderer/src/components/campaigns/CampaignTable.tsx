@@ -9,6 +9,10 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
   Active: 'default', Draft: 'secondary', Paused: 'outline', Ended: 'destructive',
 }
 
+function splitAdTypes(type: string): string[] {
+  return type.split(',').map(t => t.trim()).filter(Boolean)
+}
+
 interface Props {
   campaigns: Campaign[]
   onEdit: (c: Campaign) => void
@@ -53,7 +57,11 @@ export default function CampaignTable({ campaigns, onEdit, onDelete, onDuplicate
                 </td>
                 <td className="px-3 py-2 font-medium">{c.name}</td>
                 <td className="px-3 py-2 text-muted-foreground">{c.client}</td>
-                <td className="px-3 py-2"><Badge variant="outline">{c.type}</Badge></td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-wrap gap-1">
+                    {splitAdTypes(c.type).map(type => <Badge key={type} variant="outline">{type}</Badge>)}
+                  </div>
+                </td>
                 <td className="px-3 py-2 text-muted-foreground text-xs">{formatDate(c.start_date)} – {formatDate(c.end_date)}</td>
                 <td className="px-3 py-2"><Badge variant={STATUS_VARIANT[c.status] ?? 'secondary'}>{c.status}</Badge></td>
                 <td className="px-3 py-2 text-muted-foreground">{c.primary_kpi}</td>

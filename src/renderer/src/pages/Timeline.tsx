@@ -28,6 +28,9 @@ function fmtMoney(n?: number) {
   if (!n) return '—'
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0 })
 }
+function splitAdTypes(type: string): string[] {
+  return type.split(',').map(t => t.trim()).filter(Boolean)
+}
 
 // ── Detail Panel ──────────────────────────────────────────────────────────────
 function DetailPanel({ campaign, onClose }: { campaign: Campaign; onClose: () => void }) {
@@ -48,7 +51,9 @@ function DetailPanel({ campaign, onClose }: { campaign: Campaign; onClose: () =>
             <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
             {campaign.status}
           </span>
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{campaign.type}</span>
+          {splitAdTypes(campaign.type).map(type => (
+            <span key={type} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{type}</span>
+          ))}
         </div>
 
         {/* Key Info */}
