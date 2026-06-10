@@ -1,7 +1,7 @@
 import { ipcMain, dialog, app, shell } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import * as db from './database'
-import type { IpcResponse, Campaign, Deal, Flight, ImportOptions, PerformanceData } from '../shared/types'
+import type { IpcResponse, Campaign, CampaignLine, ImportOptions, PerformanceData } from '../shared/types'
 import fs from 'fs'
 import https from 'https'
 import path from 'path'
@@ -168,19 +168,17 @@ export function registerHandlers(): void {
   })
 
   ipcMain.handle(IPC.CAMPAIGN.CREATE, (_e,
-    data: Omit<Campaign, 'id' | 'created_at' | 'flights' | 'deals'>,
-    deals: Omit<Deal, 'id' | 'campaign_id'>[],
-    flights: Omit<Flight, 'id' | 'campaign_id'>[]
+    data: Omit<Campaign, 'id' | 'created_at' | 'lines'>,
+    lines: Omit<CampaignLine, 'id' | 'campaign_id'>[]
   ) => {
-    try { return ok(db.createCampaign(data, deals ?? [], flights ?? [])) } catch (e) { return err(e) }
+    try { return ok(db.createCampaign(data, lines ?? [])) } catch (e) { return err(e) }
   })
 
   ipcMain.handle(IPC.CAMPAIGN.UPDATE, (_e, id: number,
-    data: Omit<Campaign, 'id' | 'created_at' | 'flights' | 'deals'>,
-    deals: Omit<Deal, 'id' | 'campaign_id'>[],
-    flights: Omit<Flight, 'id' | 'campaign_id'>[]
+    data: Omit<Campaign, 'id' | 'created_at' | 'lines'>,
+    lines: Omit<CampaignLine, 'id' | 'campaign_id'>[]
   ) => {
-    try { return ok(db.updateCampaign(id, data, deals ?? [], flights ?? [])) } catch (e) { return err(e) }
+    try { return ok(db.updateCampaign(id, data, lines ?? [])) } catch (e) { return err(e) }
   })
 
   ipcMain.handle(IPC.CAMPAIGN.DELETE, (_e, id: number) => {

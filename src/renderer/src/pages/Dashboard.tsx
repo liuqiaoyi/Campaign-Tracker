@@ -78,6 +78,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [countryFilter, setCountryFilter] = useState('all')
+  const [channelFilter, setChannelFilter] = useState('all')
   const [adGroupFilter, setAdGroupFilter] = useState('all')
   const [publisherFilter, setPublisherFilter] = useState('all')
   const [mediaTypeFilter, setMediaTypeFilter] = useState('all')
@@ -102,6 +104,8 @@ export default function Dashboard() {
       .finally(() => setLoading(false))
     setDateFrom('')
     setDateTo('')
+    setCountryFilter('all')
+    setChannelFilter('all')
     setAdGroupFilter('all')
     setPublisherFilter('all')
     setMediaTypeFilter('all')
@@ -113,6 +117,8 @@ export default function Dashboard() {
       Array.from(new Set(rows.map(getter).filter(Boolean) as string[])).sort()
     return {
       adGroups: unique(r => r.ad_group),
+      countries: unique(r => r.country),
+      channels: unique(r => r.channel),
       publishers: unique(r => r.publisher_name),
       mediaTypes: unique(r => r.media_type),
       marketTypes: unique(r => r.market_type),
@@ -122,16 +128,20 @@ export default function Dashboard() {
   const filteredRows = useMemo(() => rows.filter(r => {
     if (dateFrom && r.date < dateFrom) return false
     if (dateTo && r.date > dateTo) return false
+    if (countryFilter !== 'all' && r.country !== countryFilter) return false
+    if (channelFilter !== 'all' && r.channel !== channelFilter) return false
     if (adGroupFilter !== 'all' && r.ad_group !== adGroupFilter) return false
     if (publisherFilter !== 'all' && r.publisher_name !== publisherFilter) return false
     if (mediaTypeFilter !== 'all' && r.media_type !== mediaTypeFilter) return false
     if (marketTypeFilter !== 'all' && r.market_type !== marketTypeFilter) return false
     return true
-  }), [rows, dateFrom, dateTo, adGroupFilter, publisherFilter, mediaTypeFilter, marketTypeFilter])
+  }), [rows, dateFrom, dateTo, countryFilter, channelFilter, adGroupFilter, publisherFilter, mediaTypeFilter, marketTypeFilter])
 
   const resetFilters = () => {
     setDateFrom('')
     setDateTo('')
+    setCountryFilter('all')
+    setChannelFilter('all')
     setAdGroupFilter('all')
     setPublisherFilter('all')
     setMediaTypeFilter('all')
@@ -142,7 +152,8 @@ export default function Dashboard() {
 
   // Daily trend data — includes all metrics
   const dailyData = useMemo(() => {
-    const byDate: Record<string, Record<string, number> & { date: string }> = {}
+    type DailyRow = { date: string; impressions: number; cost: number; starts: number; completes: number; clicks: number; reach_hh: number; reach_p: number }
+    const byDate: Record<string, DailyRow> = {}
     filteredRows.filter(r => r.impressions > 0).forEach(r => {
       if (!byDate[r.date]) byDate[r.date] = {
         date: r.date, impressions: 0, cost: 0, starts: 0, completes: 0,
@@ -241,6 +252,20 @@ export default function Dashboard() {
                 <select className={selectClass + ' w-full mt-1'} value={adGroupFilter} onChange={e => setAdGroupFilter(e.target.value)}>
                   <option value="all">All ad groups</option>
                   {filterOptions.adGroups.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Country</label>
+                <select className={selectClass + ' w-full mt-1'} value={countryFilter} onChange={e => setCountryFilter(e.target.value)}>
+                  <option value="all">All countries</option>
+                  {filterOptions.countries.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Channel</label>
+                <select className={selectClass + ' w-full mt-1'} value={channelFilter} onChange={e => setChannelFilter(e.target.value)}>
+                  <option value="all">All channels</option>
+                  {filterOptions.channels.map(v => <option key={v} value={v}>{v}</option>)}
                 </select>
               </div>
               <div>

@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useCampaigns } from '../hooks/useCampaigns'
-import type { Campaign, Flight } from '../../../shared/types'
-import { Badge } from '../components/ui/badge'
+import type { Campaign } from '../../../shared/types'
 import { X, ChevronRight, Calendar, DollarSign, Target, Layers } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -21,9 +20,6 @@ const STATUS_COLORS: Record<string, { bar: string; text: string; dot: string }> 
 function parseDate(s: string) { return new Date(s + 'T00:00:00') }
 function diffDays(a: Date, b: Date) { return Math.round((b.getTime() - a.getTime()) / 86400000) }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r }
-function fmtDate(d: Date) {
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 function fmtMoney(n?: number) {
   if (!n) return '—'
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0 })

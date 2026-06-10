@@ -28,13 +28,14 @@ export default function Import() {
   const { campaigns } = useCampaigns()
   const [step, setStep] = useState<Step>('select-campaign')
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null)
+  const [selectedLineId, setSelectedLineId] = useState<number | null>(null)
   const [filePath, setFilePath] = useState<string>('')
   const [parsed, setParsed] = useState<ParsedFile | null>(null)
-  const [keepZero, setKeepZero] = useState<boolean | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
 
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId)
+  const selectedLine = selectedCampaign?.lines?.find(l => l.id === selectedLineId)
 
   const handleSelectFile = async () => {
     const res = await api.dialog.openFile([
@@ -54,12 +55,11 @@ export default function Import() {
   }
 
   const handleImport = async (keepZeroImp: boolean) => {
-    if (!selectedCampaignId || !parsed) return
-    setKeepZero(keepZeroImp)
+    if (!selectedCampaignId || !selectedLineId || !parsed) return
     setStep('importing')
 
     const res = await api.performance.import(
-      { campaign_id: selectedCampaignId, file_path: filePath, keep_zero_impressions: keepZeroImp },
+      { campaign_id: selectedCampaignId, campaign_line_id: selectedLineId, file_path: filePath, keep_zero_impressions: keepZeroImp },
       parsed.rows
     )
 
@@ -75,9 +75,9 @@ export default function Import() {
   const reset = () => {
     setStep('select-campaign')
     setSelectedCampaignId(null)
+    setSelectedLineId(null)
     setFilePath('')
     setParsed(null)
-    setKeepZero(null)
     setResult(null)
     setErrorMsg('')
   }
@@ -121,7 +121,10 @@ export default function Import() {
             <select
               className={selectClass}
               value={selectedCampaignId ?? ''}
-              onChange={e => setSelectedCampaignId(Number(e.target.value) || null)}
+              onChange={e => {
+                setSelectedCampaignId(Number(e.target.value) || null)
+                setSelectedLineId(null)
+              }}
             >
               <option value="">— Select a campaign —</option>
               {campaigns.map(c => (
@@ -146,7 +149,34 @@ export default function Import() {
               </div>
             </div>
           )}
-          <Button onClick={() => setStep('select-file')} disabled={!selectedCampaignId}>
+          {selectedCampaign && (
+            <div>
+              <Label>Campaign Line</Label>
+              <select
+                className={selectClass}
+                value={selectedLineId ?? ''}
+                onChange={e => setSelectedLineId(Number(e.target.value) || null)}
+              >
+                <option value="">— Select a campaign line —</option>
+                {selectedCampaign.lines?.map(line => (
+                  <option key={line.id} value={line.id}>
+                    {[line.country, line.channel, line.ttd_campaign_id].filter(Boolean).join(' · ')}
+                  </option>
+                ))}
+              </select>
+              {selectedCampaign.lines?.length === 0 && (
+                <p className="text-xs text-orange-600 mt-1">This campaign has no lines yet.</p>
+              )}
+            </div>
+          )}
+          {selectedLine && (
+            <div className="bg-blue-50 border border-blue-100 rounded-md p-3 text-sm space-y-1">
+              <p><span className="text-muted-foreground">Line:</span> {[selectedLine.country, selectedLine.channel].filter(Boolean).join(' · ')}</p>
+              <p><span className="text-muted-foreground">TTD ID:</span> {selectedLine.ttd_campaign_id || 'Not set'}</p>
+              <p><span className="text-muted-foreground">KPI:</span> {selectedLine.primary_kpi}{selectedLine.secondary_kpi ? ` / ${selectedLine.secondary_kpi}` : ''}</p>
+            </div>
+          )}
+          <Button onClick={() => setStep('select-file')} disabled={!selectedCampaignId || !selectedLineId}>
             Next: Select File →
           </Button>
         </div>
@@ -271,6 +301,7 @@ export default function Import() {
             <div className="flex justify-between"><span className="text-muted-foreground">Imported</span><span className="font-medium text-green-700">{result.imported_rows}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Skipped (0 impressions)</span><span className="font-medium text-orange-600">{result.skipped_rows}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Campaign</span><span className="font-medium">{selectedCampaign?.name}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Line</span><span className="font-medium">{[selectedLine?.country, selectedLine?.channel].filter(Boolean).join(' · ')}</span></div>
           </div>
           <div className="flex gap-3">
             <Button onClick={reset} variant="outline">Import Another File</Button>

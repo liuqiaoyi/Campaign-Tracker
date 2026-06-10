@@ -5,7 +5,8 @@ export type DealType = 'PMP' | 'PG' | 'Open'
 
 export interface Flight {
   id: number
-  campaign_id: number
+  campaign_id?: number
+  campaign_line_id?: number
   flight_name: string
   start_date: string
   end_date: string
@@ -15,7 +16,8 @@ export interface Flight {
 
 export interface Deal {
   id: number
-  campaign_id: number
+  campaign_id?: number
+  campaign_line_id?: number
   deal_id?: string
   deal_name?: string
   deal_type?: DealType
@@ -27,18 +29,38 @@ export interface Deal {
 export interface Campaign {
   id: number
   name: string
-  ttd_campaign_id?: string        // TTD平台的Campaign ID，用于关联import数据
-  start_date: string
-  end_date: string
-  type: string
   agency?: string
   client: string
-  primary_kpi: KpiType
-  secondary_kpi?: KpiType
-  budget?: number
   status: CampaignStatus
   notes?: string
   created_at: string
+  lines?: CampaignLine[]
+  // Legacy rollup fields kept for migration/backward compatibility.
+  ttd_campaign_id?: string
+  start_date: string
+  end_date: string
+  type: string
+  primary_kpi: KpiType
+  secondary_kpi?: KpiType
+  budget?: number
+  flights?: Flight[]
+  deals?: Deal[]
+}
+
+export interface CampaignLine {
+  id: number
+  campaign_id: number
+  country?: string
+  channel: string
+  ttd_campaign_id?: string
+  start_date: string
+  end_date: string
+  budget?: number
+  cpm_goal?: number
+  primary_kpi: KpiType
+  secondary_kpi?: KpiType
+  status: CampaignStatus
+  notes?: string
   flights?: Flight[]
   deals?: Deal[]
 }
@@ -47,6 +69,9 @@ export interface Campaign {
 export interface PerformanceData {
   id: number
   campaign_id: number             // FK to campaigns table
+  campaign_line_id?: number
+  country?: string
+  channel?: string
   ttd_campaign_id?: string
   ttd_campaign_name?: string
   ad_group?: string
@@ -96,6 +121,7 @@ export interface ImportRow {
 
 export interface ImportOptions {
   campaign_id: number
+  campaign_line_id?: number
   file_path: string
   keep_zero_impressions: boolean
 }

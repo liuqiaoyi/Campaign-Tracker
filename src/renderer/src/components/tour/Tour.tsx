@@ -91,6 +91,7 @@ export function useTour() {
       const t = setTimeout(() => setVisible(true), 600)
       return () => clearTimeout(t)
     }
+    return undefined
   }, [])
 
   const startTour = useCallback(() => setVisible(true), [])

@@ -17,20 +17,19 @@ export const dealSchema = z.object({
   notes:            z.string().optional(),
 })
 
-export const campaignSchema = z.object({
-  name:             z.string().min(1, 'Campaign name is required'),
+export const campaignLineSchema = z.object({
+  country:          z.string().optional(),
+  channel:          z.string().min(1, 'Channel is required'),
   ttd_campaign_id:  z.string().optional(),
   start_date:       z.string().min(1, 'Start date is required'),
   end_date:         z.string().min(1, 'End date is required'),
-  type:             z.string().min(1, 'Select at least one ad type'),
-  agency:           z.string().optional(),
-  client:           z.string().min(1, 'Client is required'),
+  budget:           z.coerce.number().optional(),
+  cpm_goal:         z.coerce.number().optional(),
   primary_kpi:      z.enum(['CTR', 'VCR', 'Reach', 'ROAS', 'CPA', 'CPM', 'Viewability']),
   secondary_kpi:    z.preprocess(
     v => v === '' ? undefined : v,
     z.enum(['CTR', 'VCR', 'Reach', 'ROAS', 'CPA', 'CPM', 'Viewability']).optional()
   ),
-  budget:           z.coerce.number().optional(),
   status:           z.enum(['Draft', 'Active', 'Paused', 'Ended']),
   notes:            z.string().optional(),
   flights:          z.array(flightSchema).default([]),
@@ -40,5 +39,15 @@ export const campaignSchema = z.object({
   { message: 'End date must be after start date', path: ['end_date'] }
 )
 
+export const campaignSchema = z.object({
+  name:             z.string().min(1, 'Campaign name is required'),
+  agency:           z.string().optional(),
+  client:           z.string().min(1, 'Client is required'),
+  status:           z.enum(['Draft', 'Active', 'Paused', 'Ended']),
+  notes:            z.string().optional(),
+  lines:            z.array(campaignLineSchema).min(1, 'Add at least one campaign line'),
+})
+
 export type FlightFormValues = z.infer<typeof flightSchema>
+export type CampaignLineFormValues = z.infer<typeof campaignLineSchema>
 export type CampaignFormValues = z.infer<typeof campaignSchema>

@@ -34,7 +34,7 @@ export default function Settings() {
   // Load app version and data status on mount
   useEffect(() => {
     window.api.app.getVersion().then(res => {
-      if (res.success) setCurrentVersion(res.data)
+      if (res.success && res.data) setCurrentVersion(res.data)
     })
     loadDataStatus()
   }, [])
@@ -70,13 +70,13 @@ export default function Settings() {
       let version = currentVersion
       if (!version) {
         const versionRes = await window.api.app.getVersion()
-        if (versionRes.success) {
+        if (versionRes.success && versionRes.data) {
           version = versionRes.data
           setCurrentVersion(version)
         }
       }
       const res = await window.api.app.checkUpdate()
-      if (!res.success) throw new Error(res.error)
+      if (!res.success || !res.data) throw new Error(res.error ?? 'No update response')
       const latest = (res.data.tag_name as string ?? '').replace(/^v/, '')
       setLatestVersion(latest)
       setReleaseUrl(res.data.html_url ?? `https://github.com/${GITHUB_REPO}/releases`)

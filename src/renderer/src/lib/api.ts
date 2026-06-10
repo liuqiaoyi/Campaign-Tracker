@@ -1,4 +1,4 @@
-import type { Campaign, Deal, Flight, PerformanceData, ImportOptions, ImportResult, IpcResponse } from '../../../shared/types'
+import type { Campaign, CampaignLine, PerformanceData, ImportOptions, ImportResult, IpcResponse } from '../../../shared/types'
 
 declare global {
   interface Window {
@@ -6,8 +6,8 @@ declare global {
       campaign: {
         list:   () => Promise<IpcResponse<Campaign[]>>
         get:    (id: number) => Promise<IpcResponse<Campaign>>
-        create: (data: Omit<Campaign, 'id' | 'created_at' | 'flights' | 'deals'>, deals: Omit<Deal, 'id' | 'campaign_id'>[], flights: Omit<Flight, 'id' | 'campaign_id'>[]) => Promise<IpcResponse<Campaign>>
-        update: (id: number, data: Omit<Campaign, 'id' | 'created_at' | 'flights' | 'deals'>, deals: Omit<Deal, 'id' | 'campaign_id'>[], flights: Omit<Flight, 'id' | 'campaign_id'>[]) => Promise<IpcResponse<Campaign>>
+        create: (data: Omit<Campaign, 'id' | 'created_at' | 'lines'>, lines: Omit<CampaignLine, 'id' | 'campaign_id'>[]) => Promise<IpcResponse<Campaign>>
+        update: (id: number, data: Omit<Campaign, 'id' | 'created_at' | 'lines'>, lines: Omit<CampaignLine, 'id' | 'campaign_id'>[]) => Promise<IpcResponse<Campaign>>
         delete: (id: number) => Promise<IpcResponse>
       }
       performance: {

@@ -9,8 +9,8 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
   Active: 'default', Draft: 'secondary', Paused: 'outline', Ended: 'destructive',
 }
 
-function splitAdTypes(type: string): string[] {
-  return type.split(',').map(t => t.trim()).filter(Boolean)
+function splitAdTypes(type?: string): string[] {
+  return (type ?? '').split(',').map(t => t.trim()).filter(Boolean)
 }
 
 interface Props {
@@ -41,10 +41,10 @@ export default function CampaignTable({ campaigns, onEdit, onDelete, onDuplicate
             <th className="w-8 px-3 py-2" />
             <th className="text-left px-3 py-2 font-medium">Name</th>
             <th className="text-left px-3 py-2 font-medium">Client</th>
-            <th className="text-left px-3 py-2 font-medium">Type</th>
+            <th className="text-left px-3 py-2 font-medium">Channels</th>
             <th className="text-left px-3 py-2 font-medium">Dates</th>
             <th className="text-left px-3 py-2 font-medium">Status</th>
-            <th className="text-left px-3 py-2 font-medium">Primary KPI</th>
+            <th className="text-left px-3 py-2 font-medium">Lines</th>
             <th className="w-28 px-3 py-2" />
           </tr>
         </thead>
@@ -62,9 +62,9 @@ export default function CampaignTable({ campaigns, onEdit, onDelete, onDuplicate
                     {splitAdTypes(c.type).map(type => <Badge key={type} variant="outline">{type}</Badge>)}
                   </div>
                 </td>
-                <td className="px-3 py-2 text-muted-foreground text-xs">{formatDate(c.start_date)} – {formatDate(c.end_date)}</td>
+                <td className="px-3 py-2 text-muted-foreground text-xs">{c.start_date && c.end_date ? `${formatDate(c.start_date)} – ${formatDate(c.end_date)}` : '—'}</td>
                 <td className="px-3 py-2"><Badge variant={STATUS_VARIANT[c.status] ?? 'secondary'}>{c.status}</Badge></td>
-                <td className="px-3 py-2 text-muted-foreground">{c.primary_kpi}</td>
+                <td className="px-3 py-2 text-muted-foreground">{c.lines?.length ?? 0}</td>
                 <td className="px-3 py-2">
                   <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                     <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit" onClick={() => onEdit(c)}><Pencil size={13} /></Button>
@@ -83,37 +83,43 @@ export default function CampaignTable({ campaigns, onEdit, onDelete, onDuplicate
                         <p className="text-xs text-foreground whitespace-pre-wrap">{c.notes}</p>
                       </div>
                     )}
-                    {/* Flights */}
-                    {c.flights && c.flights.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Flights ({c.flights.length})</p>
-                        <div className="flex flex-wrap gap-2">
-                          {c.flights.map(f => (
-                            <div key={f.id} className="text-xs border rounded px-2 py-1 bg-background">
-                              <span className="font-medium">{f.flight_name || 'Unnamed Flight'}</span>
-                              <span className="text-muted-foreground ml-1">{formatDate(f.start_date)} – {formatDate(f.end_date)}</span>
-                              {f.budget > 0 && <span className="text-muted-foreground ml-1">${f.budget.toLocaleString()}</span>}
+                    {c.lines && c.lines.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Campaign Lines ({c.lines.length})</p>
+                        {c.lines.map(line => (
+                          <div key={line.id} className="border rounded-md p-3 bg-background text-xs space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline">{line.channel}</Badge>
+                              {line.country && <span className="font-medium">{line.country}</span>}
+                              {line.ttd_campaign_id && <span className="text-muted-foreground">TTD: {line.ttd_campaign_id}</span>}
+                              <span className="text-muted-foreground">{formatDate(line.start_date)} – {formatDate(line.end_date)}</span>
+                              {line.budget != null && line.budget > 0 && <span className="text-muted-foreground">${line.budget.toLocaleString()}</span>}
+                              {line.cpm_goal != null && <span className="text-muted-foreground">CPM Goal: ${line.cpm_goal}</span>}
+                              <span className="text-muted-foreground">KPI: {line.primary_kpi}{line.secondary_kpi ? ` / ${line.secondary_kpi}` : ''}</span>
                             </div>
-                          ))}
-                        </div>
+                            {line.flights && line.flights.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {line.flights.map(f => (
+                                  <span key={f.id} className="border rounded px-2 py-1 bg-blue-50">
+                                    {f.flight_name || 'Unnamed Flight'} · {formatDate(f.start_date)} – {formatDate(f.end_date)}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {line.deals && line.deals.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {line.deals.map(d => (
+                                  <span key={d.id} className="border rounded px-2 py-1 bg-muted/30">
+                                    {d.deal_name || d.deal_id || 'Unnamed Deal'}{d.deal_type ? ` (${d.deal_type})` : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
-                    {/* Deals */}
-                    {c.deals && c.deals.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Deals ({c.deals.length})</p>
-                        <div className="flex flex-wrap gap-2">
-                          {c.deals.map(d => (
-                            <div key={d.id} className="text-xs border rounded px-2 py-1 bg-background">
-                              <span className="font-medium">{d.deal_name || d.deal_id || 'Unnamed Deal'}</span>
-                              {d.deal_type && <span className="text-muted-foreground ml-1">({d.deal_type})</span>}
-                              {d.floor_price != null && <span className="text-muted-foreground ml-1">${d.floor_price} CPM</span>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {!c.notes && (!c.flights || c.flights.length === 0) && (!c.deals || c.deals.length === 0) && (
+                    {!c.notes && (!c.lines || c.lines.length === 0) && (
                       <p className="text-xs text-muted-foreground">No additional details.</p>
                     )}
                   </td>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useCampaigns } from '../hooks/useCampaigns'
 import { Button } from '../components/ui/button'
 import { BarChart2, Calendar, Upload, Plus, Activity } from 'lucide-react'
+import type { Campaign } from '../../../shared/types'
 
 const STATUS_DOT: Record<string, string> = {
   Active:  'bg-emerald-500',
@@ -19,6 +20,15 @@ function StatCard({ label, value, sub, color }: { label: string; value: string |
       {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
     </div>
   )
+}
+
+function campaignStart(c: Campaign): string {
+  return c.start_date ?? c.lines?.map(l => l.start_date).sort()[0] ?? ''
+}
+
+function campaignEnd(c: Campaign): string {
+  const dates = c.lines?.map(l => l.end_date).sort() ?? []
+  return c.end_date ?? dates[dates.length - 1] ?? ''
 }
 
 export default function Home() {
@@ -40,11 +50,13 @@ export default function Home() {
     return campaigns
       .filter(c => {
         if (c.status === 'Ended') return false
-        const end = new Date(c.end_date)
+        const endDate = campaignEnd(c)
+        if (!endDate) return false
+        const end = new Date(endDate)
         const days = Math.ceil((end.getTime() - today.getTime()) / 86400000)
         return days >= 0 && days <= 14
       })
-      .sort((a, b) => a.end_date.localeCompare(b.end_date))
+      .sort((a, b) => campaignEnd(a).localeCompare(campaignEnd(b)))
   }, [campaigns])
 
   // Active campaigns
@@ -97,7 +109,7 @@ export default function Home() {
               <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[c.status]}`} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">{c.name}</p>
-                <p className="text-xs text-muted-foreground">{c.client} · {c.start_date} → {c.end_date}</p>
+                <p className="text-xs text-muted-foreground">{c.client} · {campaignStart(c)} → {campaignEnd(c)}</p>
               </div>
               {c.budget && (
                 <span className="text-xs text-muted-foreground flex-shrink-0">
@@ -118,7 +130,7 @@ export default function Home() {
             <p className="text-sm text-muted-foreground py-4 text-center">No campaigns ending soon</p>
           )}
           {endingSoon.map(c => {
-            const days = Math.ceil((new Date(c.end_date).getTime() - today.getTime()) / 86400000)
+            const days = Math.ceil((new Date(campaignEnd(c)).getTime() - today.getTime()) / 86400000)
             return (
               <div key={c.id} className="flex items-center gap-3 py-2 border-t first:border-t-0">
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[c.status]}`} />

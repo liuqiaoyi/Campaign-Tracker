@@ -10,8 +10,12 @@ import { Plus, Search } from 'lucide-react'
 const selectClass = "flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 type SortKey = 'created_desc' | 'start_asc' | 'start_desc' | 'end_asc' | 'end_desc' | 'budget_desc' | 'budget_asc'
 
-function splitAdTypes(type: string): string[] {
-  return type.split(',').map(t => t.trim()).filter(Boolean)
+function splitAdTypes(type?: string): string[] {
+  return (type ?? '').split(',').map(t => t.trim()).filter(Boolean)
+}
+
+function firstDate(c: Campaign, key: 'start_date' | 'end_date'): string {
+  return c[key] ?? c.lines?.[0]?.[key] ?? ''
 }
 
 export default function Campaigns() {
@@ -24,25 +28,28 @@ export default function Campaigns() {
   const [sortBy, setSortBy] = useState<SortKey>('created_desc')
 
   const statusOptions = useMemo(() => Array.from(new Set(campaigns.map(c => c.status))).sort(), [campaigns])
-  const typeOptions = useMemo(() => Array.from(new Set(campaigns.flatMap(c => splitAdTypes(c.type)))).sort(), [campaigns])
+  const typeOptions = useMemo(() => Array.from(new Set(campaigns.flatMap(c => c.lines?.map(l => l.channel) ?? splitAdTypes(c.type)))).sort(), [campaigns])
 
   const filteredCampaigns = useMemo(() => {
     const q = search.trim().toLowerCase()
     return campaigns
       .filter(c => {
+        const lineValues = c.lines?.flatMap(l => [
+          l.country, l.channel, l.ttd_campaign_id, l.primary_kpi, l.secondary_kpi,
+        ]) ?? []
         const matchesSearch = !q || [
-          c.name, c.client, c.agency, c.ttd_campaign_id, c.primary_kpi, c.secondary_kpi,
+          c.name, c.client, c.agency, ...lineValues,
         ].some(v => String(v ?? '').toLowerCase().includes(q))
         const matchesStatus = statusFilter === 'all' || c.status === statusFilter
-        const matchesType = typeFilter === 'all' || splitAdTypes(c.type).includes(typeFilter)
+        const matchesType = typeFilter === 'all' || (c.lines?.some(l => l.channel === typeFilter) ?? splitAdTypes(c.type).includes(typeFilter))
         return matchesSearch && matchesStatus && matchesType
       })
       .sort((a, b) => {
         switch (sortBy) {
-          case 'start_asc': return a.start_date.localeCompare(b.start_date)
-          case 'start_desc': return b.start_date.localeCompare(a.start_date)
-          case 'end_asc': return a.end_date.localeCompare(b.end_date)
-          case 'end_desc': return b.end_date.localeCompare(a.end_date)
+          case 'start_asc': return firstDate(a, 'start_date').localeCompare(firstDate(b, 'start_date'))
+          case 'start_desc': return firstDate(b, 'start_date').localeCompare(firstDate(a, 'start_date'))
+          case 'end_asc': return firstDate(a, 'end_date').localeCompare(firstDate(b, 'end_date'))
+          case 'end_desc': return firstDate(b, 'end_date').localeCompare(firstDate(a, 'end_date'))
           case 'budget_asc': return (a.budget ?? 0) - (b.budget ?? 0)
           case 'budget_desc': return (b.budget ?? 0) - (a.budget ?? 0)
           case 'created_desc':
@@ -75,6 +82,14 @@ export default function Campaigns() {
       name: `Copy of ${c.name}`,
       status: 'Draft',
       created_at: '',
+      lines: c.lines?.map(line => ({
+        ...line,
+        id: 0,
+        campaign_id: 0,
+        status: 'Draft',
+        flights: line.flights?.map(f => ({ ...f, id: 0, campaign_id: 0, campaign_line_id: 0 })),
+        deals: line.deals?.map(d => ({ ...d, id: 0, campaign_id: 0, campaign_line_id: 0 })),
+      })),
     })
     setShowForm(true)
   }
@@ -91,7 +106,7 @@ export default function Campaigns() {
           <Input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by campaign, client, agency, TTD ID, or KPI..."
+            placeholder="Search by campaign, client, agency, country, channel, TTD ID, or KPI..."
             className="pl-9"
           />
         </div>
@@ -101,7 +116,7 @@ export default function Campaigns() {
             {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <select className={selectClass} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
-            <option value="all">All types</option>
+            <option value="all">All channels</option>
             {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           <select className={selectClass} value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)}>

@@ -6,8 +6,8 @@ const api = {
   campaign: {
     list:   ()                                           => ipcRenderer.invoke(IPC.CAMPAIGN.LIST),
     get:    (id: number)                                 => ipcRenderer.invoke(IPC.CAMPAIGN.GET, id),
-    create: (data: unknown, deals: unknown, flights: unknown) => ipcRenderer.invoke(IPC.CAMPAIGN.CREATE, data, deals, flights),
-    update: (id: number, data: unknown, deals: unknown, flights: unknown) => ipcRenderer.invoke(IPC.CAMPAIGN.UPDATE, id, data, deals, flights),
+    create: (data: unknown, lines: unknown) => ipcRenderer.invoke(IPC.CAMPAIGN.CREATE, data, lines),
+    update: (id: number, data: unknown, lines: unknown) => ipcRenderer.invoke(IPC.CAMPAIGN.UPDATE, id, data, lines),
     delete: (id: number)                                 => ipcRenderer.invoke(IPC.CAMPAIGN.DELETE, id),
   },
   performance: {
