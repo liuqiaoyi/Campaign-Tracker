@@ -94,8 +94,8 @@ function cloneLineForAppend(line?: CampaignFormValues['lines'][number]): Campaig
   if (!line) return emptyLine()
   return {
     ...line,
-    // Keep planning inputs, but avoid accidentally reusing the same platform campaign ID.
-    ttd_campaign_id: '',
+    // Keep all inputs from the previous line so users only edit the fields that differ.
+    ttd_campaign_id: line.ttd_campaign_id ?? '',
     flights: line.flights?.map(f => ({ ...f })) ?? [],
     deals: line.deals?.map(d => ({ ...d })) ?? [],
   }
