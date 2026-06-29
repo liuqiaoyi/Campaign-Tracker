@@ -6,7 +6,7 @@
 import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
-import type { Campaign, CampaignLine, Deal, Flight, PerformanceData, ImportOptions, ImportResult } from '../shared/types'
+import type { Campaign, CampaignLine, CampaignStatus, Deal, Flight, PerformanceData, ImportOptions, ImportResult } from '../shared/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _db: any = null
@@ -29,6 +29,28 @@ function save() {
 
 function timestampForFileName(): string {
   return new Date().toISOString().replace(/[:.]/g, '-')
+}
+
+function todayLocalDateString(): string {
+  const now = new Date()
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 10)
+}
+
+function deriveLineStatus(line: { start_date: string; end_date: string; status?: string }, today: string): CampaignStatus {
+  if (line.status === 'Paused') return 'Paused'
+  if (today > line.end_date) return 'Ended'
+  if (today >= line.start_date) return 'Active'
+  return 'Draft'
+}
+
+function deriveCampaignStatus(lines: Array<{ status: string }>, currentStatus?: string): CampaignStatus | null {
+  if (currentStatus === 'Paused') return 'Paused'
+  if (lines.length === 0) return null
+  if (lines.every(line => line.status === 'Ended')) return 'Ended'
+  if (lines.some(line => line.status === 'Active')) return 'Active'
+  if (lines.some(line => line.status === 'Paused')) return 'Paused'
+  return 'Draft'
 }
 
 /** Run a statement that produces no result rows. */
@@ -153,6 +175,7 @@ function createSchema() {
   ensureColumn('deals', 'campaign_line_id', 'INTEGER')
   ensureColumn('performance_data', 'campaign_line_id', 'INTEGER')
   migrateLegacyCampaigns()
+  syncCampaignStatusesByDate()
   // Persist schema changes
   save()
 }
@@ -211,6 +234,35 @@ function migrateLegacyCampaigns() {
     db.run('UPDATE deals SET campaign_line_id = ? WHERE campaign_id = ? AND campaign_line_id IS NULL', [lineId, c.id])
     db.run('UPDATE performance_data SET campaign_line_id = ? WHERE campaign_id = ? AND campaign_line_id IS NULL', [lineId, c.id])
   }
+}
+
+function syncCampaignStatusesByDate() {
+  const db = getDb()
+  const today = todayLocalDateString()
+  let changed = false
+
+  const lines = queryAll<{ id: number; campaign_id: number; start_date: string; end_date: string; status: string }>(
+    'SELECT id, campaign_id, start_date, end_date, status FROM campaign_lines'
+  )
+  for (const line of lines) {
+    const nextStatus = deriveLineStatus(line, today)
+    if (nextStatus !== line.status) {
+      db.run('UPDATE campaign_lines SET status = ? WHERE id = ?', [nextStatus, line.id])
+      changed = true
+    }
+  }
+
+  const campaigns = queryAll<{ id: number; status: string }>('SELECT id, status FROM campaigns')
+  for (const campaign of campaigns) {
+    const campaignLines = queryAll<{ status: string }>('SELECT status FROM campaign_lines WHERE campaign_id = ?', [campaign.id])
+    const nextStatus = deriveCampaignStatus(campaignLines, campaign.status)
+    if (nextStatus && nextStatus !== campaign.status) {
+      db.run('UPDATE campaigns SET status = ? WHERE id = ?', [nextStatus, campaign.id])
+      changed = true
+    }
+  }
+
+  if (changed) save()
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -323,11 +375,13 @@ function loadCampaign(id: number): Campaign | undefined {
 }
 
 export function listCampaigns(): Campaign[] {
+  syncCampaignStatusesByDate()
   const rows = queryAll<{ id: number }>('SELECT id FROM campaigns ORDER BY created_at DESC')
   return rows.map(c => loadCampaign(c.id)).filter(Boolean) as Campaign[]
 }
 
 export function getCampaign(id: number): Campaign | undefined {
+  syncCampaignStatusesByDate()
   return loadCampaign(id)
 }
 
