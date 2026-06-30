@@ -20,7 +20,7 @@ let _dbPath = ''
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getDb() {
-  if (!_db) throw new Error('Database not initialized. Call initDatabase() first.')
+  if (!_db) throw new Error('Database not initialized. Call initDb() first.')
   return _db
 }
 

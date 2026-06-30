@@ -43,7 +43,7 @@ const lineShape = {
 const lineSchema = z.object(lineShape)
 const dataSchema = z.object({
   name: z.string(),
-  client: z.string(),
+  client: z.string().optional(),
   agency: z.string().optional(),
   status: z.string().optional(),
   notes: z.string().optional(),
@@ -71,7 +71,7 @@ export function buildServer(): McpServer {
     { campaign_id: z.number(), from: z.string().optional(), to: z.string().optional() },
     fresh(queryPerformanceTool))
 
-  s.tool('create_campaign', 'Create a campaign. Requires name, client and at least one line.',
+  s.tool('create_campaign', 'Create a campaign. Requires name and at least one line.',
     { data: dataSchema, lines: z.array(lineSchema) },
     fresh(createCampaignTool))
 

@@ -83,7 +83,7 @@ Adjust the path if your database or project is in a different location.
 
 | Variable | Description |
 |----------|-------------|
-| `CAMPAIGN_TRACKER_DB` | Full path to `campaign-tracker.db`. If not set, the server searches default OS locations (`~/Library/Application Support/campaign-tracker/`, `~/.config/campaign-tracker/`). |
+| `CAMPAIGN_TRACKER_DB` | Full path to `campaign-tracker.db`. If not set, the server auto-detects by checking `~/Library/Application Support/{campaign-tracker,Campaign Tracker}/` and `~/.config/{campaign-tracker,Campaign Tracker}/` on macOS/Linux, plus `%APPDATA%/{campaign-tracker,Campaign Tracker}/` on Windows (covers both dev and packaged installs). |
 
 ## Running manually
 
