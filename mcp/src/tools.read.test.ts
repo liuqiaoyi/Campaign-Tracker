@@ -13,7 +13,7 @@ describe('mcp read tools', () => {
     const dbPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ct-rt-')), 'test.db')
     await db.initDb({ dbPath, wasmPath })
     const c = db.createCampaign({ name: 'Nike Summer', client: 'Nike' } as any,
-      [{ channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'VCR' } as any])
+      [{ channel: 'CTV', ttd_campaign_id: 'line-ttd-123', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'VCR' } as any])
     id = c.id
   })
 
@@ -29,5 +29,12 @@ describe('mcp read tools', () => {
   it('list_campaigns includes data status', () => {
     const list = listCampaignsTool() as any[]
     expect(list.find(x => x.campaign.id === id)?.hasData).toBe(false)
+  })
+
+  it('find_campaign matches by line-level TTD campaign id and returns line summaries', () => {
+    const hits = findCampaignTool({ query: 'line-ttd-123' }) as any[]
+    const hit = hits.find(h => h.id === id)
+    expect(hit).toBeTruthy()
+    expect(hit.lines.some((l: any) => l.ttd_campaign_id === 'line-ttd-123')).toBe(true)
   })
 })

@@ -458,6 +458,104 @@ export function updateCampaign(
   return loadCampaign(id)
 }
 
+type CampaignLinePatch = Partial<Omit<CampaignLine, 'campaign_id'>> & { id?: number }
+type CampaignPatch = Partial<Omit<Campaign, 'id' | 'created_at' | 'lines' | 'flights' | 'deals'>>
+
+function lineMatchKey(line: Pick<CampaignLine, 'country' | 'channel' | 'notes'>): string {
+  return [
+    line.country ?? '',
+    line.channel ?? '',
+    line.notes ?? '',
+  ].map(v => String(v).trim().toLowerCase()).join('|')
+}
+
+function updateCampaignLine(lineId: number, line: CampaignLinePatch) {
+  const db = getDb()
+  db.run(
+    `UPDATE campaign_lines SET country=?, channel=?, ttd_campaign_id=?, start_date=?, end_date=?,
+      budget=?, cpm_goal=?, primary_kpi=?, secondary_kpi=?, status=?, notes=? WHERE id=?`,
+    [
+      line.country ?? null,
+      line.channel,
+      line.ttd_campaign_id ?? null,
+      line.start_date,
+      line.end_date,
+      line.budget ?? 0,
+      line.cpm_goal ?? null,
+      line.primary_kpi,
+      line.secondary_kpi ?? null,
+      line.status ?? 'Draft',
+      line.notes ?? null,
+      lineId,
+    ]
+  )
+}
+
+function updateCampaignRollup(id: number, data: CampaignPatch) {
+  const db = getDb()
+  const current = loadCampaign(id)
+  if (!current) return
+  const lines = loadLines(id)
+  const firstLine = lines[0]
+  db.run(
+    `UPDATE campaigns SET name=?, ttd_campaign_id=?, start_date=?, end_date=?, type=?, agency=?,
+      client=?, primary_kpi=?, secondary_kpi=?, budget=?, status=?, notes=? WHERE id=?`,
+    [
+      data.name ?? current.name,
+      firstLine?.ttd_campaign_id ?? current.ttd_campaign_id ?? null,
+      firstLine?.start_date ?? current.start_date,
+      firstLine?.end_date ?? current.end_date,
+      firstLine?.channel ?? current.type,
+      data.agency ?? current.agency ?? null,
+      data.client ?? current.client ?? null,
+      firstLine?.primary_kpi ?? current.primary_kpi,
+      firstLine?.secondary_kpi ?? current.secondary_kpi ?? null,
+      firstLine?.budget ?? current.budget ?? 0,
+      data.status ?? current.status,
+      data.notes ?? current.notes ?? null,
+      id,
+    ]
+  )
+}
+
+export function patchCampaign(
+  id: number,
+  data: CampaignPatch = {},
+  lines: CampaignLinePatch[] = []
+): Campaign | undefined {
+  const current = loadCampaign(id)
+  if (!current) return undefined
+
+  const existingLines = loadLines(id)
+  const existingById = new Map(existingLines.map(line => [line.id, line]))
+  const usedLineIds = new Set<number>()
+
+  for (const linePatch of lines) {
+    let target = linePatch.id ? existingById.get(linePatch.id) : undefined
+    if (linePatch.id && !target) throw new Error(`Campaign line ${linePatch.id} not found on campaign ${id}`)
+
+    if (!target) {
+      const key = lineMatchKey(linePatch as CampaignLine)
+      target = existingLines.find(line => !usedLineIds.has(line.id) && lineMatchKey(line) === key)
+    }
+
+    if (target) {
+      usedLineIds.add(target.id)
+      updateCampaignLine(target.id, { ...target, ...linePatch })
+      continue
+    }
+
+    if (!linePatch.channel || !linePatch.start_date || !linePatch.end_date || !linePatch.primary_kpi) {
+      throw new Error('New campaign lines require channel, start_date, end_date and primary_kpi.')
+    }
+    insertCampaignLines(id, [linePatch as Omit<CampaignLine, 'id' | 'campaign_id'>])
+  }
+
+  updateCampaignRollup(id, data)
+  save()
+  return loadCampaign(id)
+}
+
 function insertCampaignLines(campaignId: number, lines: Array<Omit<CampaignLine, 'id' | 'campaign_id'>>) {
   const db = getDb()
   for (const line of lines) {

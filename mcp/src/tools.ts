@@ -19,8 +19,28 @@ export function findCampaignTool(args: { query: string }) {
     .filter(c =>
       c.name.toLowerCase().includes(q) ||
       (c.client ?? '').toLowerCase().includes(q) ||
-      (c.ttd_campaign_id ?? '').toLowerCase().includes(q))
-    .map(c => ({ id: c.id, name: c.name, client: c.client, ttd_campaign_id: c.ttd_campaign_id, status: c.status }))
+      (c.ttd_campaign_id ?? '').toLowerCase().includes(q) ||
+      (c.lines ?? []).some(l => (l.ttd_campaign_id ?? '').toLowerCase().includes(q)))
+    .map(c => ({
+      id: c.id,
+      name: c.name,
+      client: c.client,
+      ttd_campaign_id: c.ttd_campaign_id,
+      status: c.status,
+      lines: c.lines?.map(l => ({
+        id: l.id,
+        country: l.country,
+        channel: l.channel,
+        ttd_campaign_id: l.ttd_campaign_id,
+        start_date: l.start_date,
+        end_date: l.end_date,
+        budget: l.budget,
+        cpm_goal: l.cpm_goal,
+        primary_kpi: l.primary_kpi,
+        status: l.status,
+        notes: l.notes,
+      })) ?? [],
+    }))
 }
 
 export function queryPerformanceTool(args: { campaign_id: number; from?: string; to?: string }) {
@@ -50,25 +70,28 @@ export function createCampaignTool(args: { data: any; lines: any[] }) {
   return { campaign, note: RESTART_NOTE }
 }
 
-export function updateCampaignTool(args: { id: number; data: any; lines: any[] }) {
+export function updateCampaignTool(args: { id: number; data?: any; lines?: any[] }) {
   if (!db.getCampaign(args.id)) throw new Error(`Campaign ${args.id} not found`)
-  assertLines(args.lines)
+  if (!args.data && (!Array.isArray(args.lines) || args.lines.length === 0)) {
+    throw new Error('Provide campaign data or at least one line patch to update.')
+  }
   backupBeforeWrite()
-  const campaign = db.updateCampaign(args.id, args.data, args.lines)
+  const campaign = db.patchCampaign(args.id, args.data ?? {}, args.lines ?? [])
   return { campaign, note: RESTART_NOTE }
 }
 
-export function previewImportTool(args: { file_path: string }) {
-  return parseFile(args.file_path)
+export function previewImportTool(args: { file_path: string; sheet_name?: string }) {
+  return parseFile(args.file_path, { sheet_name: args.sheet_name })
 }
 
 export function importPerformanceTool(args: {
   campaign_id: number
   campaign_line_id: number
   file_path: string
+  sheet_name?: string
   keep_zero_impressions?: boolean
 }) {
-  const parsed = parseFile(args.file_path)
+  const parsed = parseFile(args.file_path, { sheet_name: args.sheet_name })
   const mapping = getImportMapping(parsed.columns)
   if (mapping.missingRequired.length > 0) {
     throw new Error(`Missing required columns: ${mapping.missingRequired.join(', ')}`)

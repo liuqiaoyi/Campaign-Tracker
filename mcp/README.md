@@ -5,10 +5,11 @@ Exposes your local Campaign Tracker SQLite database as an MCP (Model Context Pro
 ## Installation
 
 ```bash
+npm install
 cd mcp && npm install
 ```
 
-No build step is needed — the server is run directly via `tsx`.
+No build step is needed — the server is run directly via `tsx`. Install both the repository root dependencies and the `mcp/` package dependencies because the MCP server reuses shared code from `src/core/`.
 
 ## Prerequisites and important notes
 
@@ -40,9 +41,9 @@ The read tools (`list_campaigns`, `get_campaign`, `find_campaign`, `query_perfor
 | `find_campaign` | Fuzzy-find campaigns by name, client, or TTD campaign ID |
 | `query_performance` | Query performance rows for a campaign, with optional date range |
 | `create_campaign` | Create a new campaign with at least one line |
-| `update_campaign` | Replace a campaign and all its lines |
-| `preview_import` | Parse a TTD Excel/CSV and report column mapping WITHOUT writing to the DB |
-| `import_performance` | Import performance data from a file into a campaign line (replaces existing rows for that line) |
+| `update_campaign` | Patch a campaign and/or its lines; omitted existing lines are preserved |
+| `preview_import` | Parse a TTD Excel/CSV and report column mapping WITHOUT writing to the DB; optional `sheet_name` |
+| `import_performance` | Import performance data from a file into a campaign line (replaces existing rows for that line); optional `sheet_name` |
 
 ## Client configuration
 
@@ -55,16 +56,13 @@ The repository includes `.mcp.json` at the project root. When you start Claude C
   "mcpServers": {
     "campaign-tracker": {
       "command": "npx",
-      "args": ["tsx", "./mcp/src/index.ts"],
-      "env": {
-        "CAMPAIGN_TRACKER_DB": "${HOME}/Library/Application Support/campaign-tracker/campaign-tracker.db"
-      }
+      "args": ["tsx", "./mcp/src/index.ts"]
     }
   }
 }
 ```
 
-If the database is not at the default location, set the `CAMPAIGN_TRACKER_DB` environment variable to its full path.
+The server auto-detects the database location on macOS, Linux, and Windows. If the database is not at a default location, set `CAMPAIGN_TRACKER_DB` to its full path.
 
 ### Codex
 
@@ -77,7 +75,14 @@ args = ["tsx", "/Users/derrick/Desktop/Campaign-Tracker/mcp/src/index.ts"]
 env = { CAMPAIGN_TRACKER_DB = "/Users/derrick/Library/Application Support/campaign-tracker/campaign-tracker.db" }
 ```
 
-Adjust the path if your database or project is in a different location.
+Adjust the path if your database or project is in a different location. On Windows, use absolute paths for both the project and database:
+
+```toml
+[mcp_servers.campaign-tracker]
+command = "npx"
+args = ["tsx", "C:\\Users\\derrick.liu\\OneDrive - The Trade Desk\\Works\\Campaign Tracker\\mcp\\src\\index.ts"]
+env = { CAMPAIGN_TRACKER_DB = "C:\\Users\\derrick.liu\\AppData\\Roaming\\campaign-tracker\\campaign-tracker.db" }
+```
 
 ## Environment variables
 
@@ -92,3 +97,7 @@ CAMPAIGN_TRACKER_DB="/path/to/campaign-tracker.db" npx tsx mcp/src/index.ts
 ```
 
 The server communicates via stdin/stdout (JSON-RPC). All diagnostic output goes to stderr.
+
+## Import notes
+
+For workbooks with multiple sheets, `preview_import` and `import_performance` automatically scan sheets and choose the first one with a header row containing the required `Date` and `Impressions` columns. You can pass `sheet_name` to force a specific sheet.

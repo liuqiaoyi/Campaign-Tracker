@@ -28,6 +28,7 @@ function fresh(fn: (a: any) => unknown): (a: any) => Promise<ReturnType<typeof j
 }
 
 const lineShape = {
+  id: z.number().optional(),
   channel: z.string(),
   country: z.string().optional(),
   start_date: z.string(),
@@ -41,6 +42,20 @@ const lineShape = {
   ttd_campaign_id: z.string().optional(),
 }
 const lineSchema = z.object(lineShape)
+const linePatchSchema = z.object({
+  id: z.number().optional(),
+  channel: z.string().optional(),
+  country: z.string().optional(),
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
+  budget: z.number().optional(),
+  cpm_goal: z.number().optional(),
+  primary_kpi: z.string().optional(),
+  secondary_kpi: z.string().optional(),
+  status: z.string().optional(),
+  notes: z.string().optional(),
+  ttd_campaign_id: z.string().optional(),
+})
 const dataSchema = z.object({
   name: z.string(),
   client: z.string().optional(),
@@ -48,6 +63,7 @@ const dataSchema = z.object({
   status: z.string().optional(),
   notes: z.string().optional(),
 })
+const dataPatchSchema = dataSchema.partial()
 
 export function buildServer(): McpServer {
   // Cast to `any` for tool registration calls only.
@@ -75,17 +91,17 @@ export function buildServer(): McpServer {
     { data: dataSchema, lines: z.array(lineSchema) },
     fresh(createCampaignTool))
 
-  s.tool('update_campaign', 'Replace a campaign and its lines. Requires id.',
-    { id: z.number(), data: dataSchema, lines: z.array(lineSchema) },
+  s.tool('update_campaign', 'Patch a campaign and/or its lines. Omitted existing lines are preserved.',
+    { id: z.number(), data: dataPatchSchema.optional(), lines: z.array(linePatchSchema).optional() },
     fresh(updateCampaignTool))
 
   s.tool('preview_import', 'Parse a TTD Excel/CSV and report column mapping WITHOUT writing.',
-    { file_path: z.string() }, fresh(previewImportTool))
+    { file_path: z.string(), sheet_name: z.string().optional() }, fresh(previewImportTool))
 
   s.tool('import_performance', 'Import performance data from a file into a campaign line (replaces existing rows for that line).',
     {
       campaign_id: z.number(), campaign_line_id: z.number(),
-      file_path: z.string(), keep_zero_impressions: z.boolean().optional(),
+      file_path: z.string(), sheet_name: z.string().optional(), keep_zero_impressions: z.boolean().optional(),
     },
     fresh(importPerformanceTool))
 
