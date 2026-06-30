@@ -13,6 +13,10 @@
 - Node 内置 sql.js 是 **WASM 引擎，整库读入内存、每次改动整文件覆写**；外部写入与应用内存副本是 last-writer-wins。所有 MCP 写工具**必须先自动备份**再写。
 - 产出 `.db` 是标准 SQLite 格式，sql.js 在 Node 下需要 `sql-wasm.wasm`，路径：`node_modules/sql.js/dist/sql-wasm.wasm`。
 - 不依赖 electron 的代码一律放 `src/core/`；`src/main/` 才能 `import { app } from 'electron'`。
+- 共享层加载 sql.js 用 **ESM 默认导入** `import initSqlJs from 'sql.js'`（不用 `require`，否则 vitest/vite 下 `require is not defined`）。
+- 共享层只能用 `console.error` 打日志，**禁止 `console.log`**——MCP stdout 是 JSON-RPC 协议通道，写 stdout 会破坏协议。
+- MCP server 每次工具调用前 `db.reloadFromDisk()`，保证读到 app 当前磁盘上的最新数据（解决内存缓存导致的 stale 问题）。
+- MCP 运行时用 **`tsx` 直接执行 TS**，不做 tsc 编译；tsc 仅用于 `--noEmit` 类型检查。工具 schema 用 **zod raw shape**（MCP SDK 要求）。
 - 共享数据层对外 API 名称**保持与现有 `database.ts` 完全一致**（`listCampaigns / getCampaign / createCampaign / updateCampaign / queryPerformance / importPerformance / backupDatabaseTo / getDatabasePath / restoreDatabaseFrom / hasPerformanceData / listCampaignsWithDataStatus / deletePerformanceData`），避免改动 `ipc-handlers.ts` 的调用点。
 - **不提供任何 `delete_*` MCP 工具**（用户要求，AI 无删除权限）。
 - 必填字段：campaign 的 `name`；每条 line 的 `channel / start_date / end_date / primary_kpi`。业绩导入必填列：`date / impressions`。
@@ -32,13 +36,14 @@
 **Interfaces:**
 - Produces: `npm test` 可运行 vitest；`src/core/` 下 `*.test.ts` 会被识别。
 
-- [ ] **Step 1: 安装 vitest**
+- [ ] **Step 1: 安装 vitest + tsx（根目录）**
 
 Run:
 ```bash
-npm install -D vitest@^2.1.0
+npm install -D vitest@^2.1.0 tsx@^4.19.0
 ```
-Expected: `vitest` 写入 devDependencies，无报错。
+Expected: `vitest`、`tsx` 写入根 `package.json` devDependencies，无报错。
+（`tsx` 装在仓库根，使 `.mcp.json` 的 `npx tsx ./mcp/src/index.ts`（cwd = 仓库根）能本地解析到，不必临时下载。）
 
 - [ ] **Step 2: 写 vitest 配置**
 
@@ -102,6 +107,7 @@ git commit -m "test: add vitest test runner"
 **Interfaces:**
 - Produces:
   - `initDb(opts: { dbPath: string; wasmPath: string }): Promise<void>`
+  - `reloadFromDisk(): void`（丢弃内存副本、重读磁盘；MCP 每次工具调用前用）
   - `getDatabasePath(): string`
   - `listCampaigns(): Campaign[]`
   - `getCampaign(id: number): Campaign | undefined`
@@ -166,28 +172,45 @@ Expected: FAIL（`./db` 模块不存在）。
 
 - [ ] **Step 3: 创建 `src/core/db.ts`**
 
-把 `src/main/database.ts` 的**全部内容**复制到 `src/core/db.ts`，然后做以下 3 处修改：
+把 `src/main/database.ts` 的**全部内容**复制到 `src/core/db.ts`，然后做以下 4 处修改：
 
-1. 删除顶部 `import { app } from 'electron'` 和 `import * as path from 'path'`（path 仍需要，保留 path，仅删 electron 那行）。把 `import type { ... } from '../shared/types'` 改为 `import type { ... } from '../shared/types'`（路径不变，仍是 `../shared/types`）。
+1. 删除顶部 `import { app } from 'electron'`。**保留** `import * as fs from 'fs'` 和 `import * as path from 'path'`（`save` 用 fs，`restoreDatabaseFrom` 用 path），以及 `import type { ... } from '../shared/types'`（路径不变，core 和 main 到 shared 的相对深度相同）。
 
-2. 把现有的 `export async function initDatabase(): Promise<void> { ... }` 整个替换为接收注入路径的版本：
+2. 在顶部 import 区加入 sql.js 的 **ESM 默认导入**（替代原 `require('sql.js')`，因为 vitest/vite 把 TS 当 ESM，模块作用域没有 `require`；electron-vite 经 esModuleInterop 同样兼容此写法）：
 ```ts
-export async function initDb(opts: { dbPath: string; wasmPath: string }): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const initSqlJs = require('sql.js')
-  _SQL = await initSqlJs({ locateFile: () => opts.wasmPath })
-  _dbPath = opts.dbPath
+// @ts-expect-error - sql.js ships no bundled types
+import initSqlJs from 'sql.js'
+```
+
+3. 把现有的 `export async function initDatabase(): Promise<void> { ... }` 整个替换为下面两段：注入路径的 `initDb` + 可重载的 `reloadFromDisk`。**注意 `console.log` 改成 `console.error`**——MCP 的 stdout 是 JSON-RPC 协议通道，打到 stdout 会破坏协议；electron 端不受影响。
+```ts
+function loadFromDisk(): void {
   if (fs.existsSync(_dbPath)) {
     _db = new _SQL.Database(fs.readFileSync(_dbPath))
   } else {
     _db = new _SQL.Database()
   }
+}
+
+export async function initDb(opts: { dbPath: string; wasmPath: string }): Promise<void> {
+  _SQL = await initSqlJs({ locateFile: () => opts.wasmPath })
+  _dbPath = opts.dbPath
+  loadFromDisk()
   createSchema()
-  console.log(`[DB] SQLite ready at: ${_dbPath}`)
+  console.error(`[DB] SQLite ready at: ${_dbPath}`)
+}
+
+/** Re-read the DB file from disk, discarding the in-memory copy.
+ *  MCP calls this before each tool so the AI never sees stale data
+ *  (e.g. campaigns the user just created in the running app). */
+export function reloadFromDisk(): void {
+  if (!_SQL) throw new Error('Database not initialized. Call initDb() first.')
+  _db?.close?.()
+  loadFromDisk()
 }
 ```
 
-3. 其余所有函数（`createSchema / run / queryAll / createCampaign / updateCampaign / importPerformance / backupDatabaseTo / restoreDatabaseFrom / deriveLineStatus` 等）**原样保留**，不改动。
+4. 其余所有函数（`createSchema / run / queryAll / createCampaign / updateCampaign / importPerformance / backupDatabaseTo / restoreDatabaseFrom / deriveLineStatus` 等）**原样保留**，不改动。
 
 - [ ] **Step 4: 运行测试确认通过**
 
@@ -467,17 +490,20 @@ git commit -m "refactor: extract file parsing into src/core/parse-file.ts"
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",
-  "bin": { "campaign-tracker-mcp": "dist/index.js" },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
   }
 }
 ```
-（`sql.js`、`xlsx` 复用仓库根 `node_modules`，不重复声明。）
+（`sql.js`、`xlsx` 复用仓库根 `node_modules`，不重复声明。**用 `tsx` 直接运行 TS，不做 tsc 编译**——避免跨 `mcp/` 与 `src/` 两处源码时 `rootDir`/`outDir` 产生嵌套输出、破坏入口路径的问题。`zod` 是 MCP SDK 定义工具 schema 所必需。）
 
 - [ ] **Step 2: 写 `mcp/tsconfig.json`**
 
@@ -491,13 +517,13 @@ git commit -m "refactor: extract file parsing into src/core/parse-file.ts"
     "resolveJsonModule": true,
     "strict": true,
     "skipLibCheck": true,
-    "outDir": "dist",
-    "rootDir": ".."
+    "noEmit": true
   },
   "include": ["src/**/*.ts", "../src/core/**/*.ts", "../src/shared/**/*.ts"],
   "exclude": ["**/*.test.ts"]
 }
 ```
+（仅用于 `npm run typecheck` 静态检查，不产出文件；运行时由 `tsx` 直接执行源码。）
 
 - [ ] **Step 3: 安装 SDK**
 
@@ -942,13 +968,18 @@ git commit -m "feat(mcp): add preview/import performance tools"
 - Create: `.mcp.json`（Claude Code 项目级配置）
 
 **Interfaces:**
-- Consumes: 全部 `tools.ts` 导出、`resolveDbPath / resolveWasmPath`（Task 5）、`core.initDb`（Task 2）。
-- Produces: 可执行 `node mcp/dist/index.js`，stdio MCP server，暴露 8 个工具。
+- Consumes: 全部 `tools.ts` 导出、`resolveDbPath / resolveWasmPath`（Task 5）、`core.initDb / core.reloadFromDisk`（Task 2）。
+- Produces: 可执行 `npx tsx mcp/src/index.ts`，stdio MCP server，暴露 8 个工具；每次工具调用前 `reloadFromDisk()` 保证读到最新磁盘数据。
 
 - [ ] **Step 1: 创建 `mcp/src/server.ts`**
 
+> MCP SDK（1.x）的 `McpServer.tool(name, description, paramsSchema, cb)` 的 `paramsSchema` 是 **zod raw shape**（每个字段是一个 zod 校验器），不是 JSON Schema。`zod` 随 SDK 安装在根 `node_modules`，Task 5 也已在 `mcp/package.json` 显式声明。
+> 每个工具 handler 在执行前调用 `db.reloadFromDisk()`，确保 AI 看到的是 app 当前磁盘上的最新数据（用户刚在 app 里建的 campaign 也能被 find/list 到），从而正确判断 insert 还是 update。
+
 ```ts
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import * as db from '../../src/core/db'
 import {
   listCampaignsTool, getCampaignTool, findCampaignTool, queryPerformanceTool,
   createCampaignTool, updateCampaignTool, previewImportTool, importPerformanceTool,
@@ -958,63 +989,74 @@ function json(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] }
 }
 
-const lineSchema = {
-  type: 'object',
-  required: ['channel', 'start_date', 'end_date', 'primary_kpi'],
-  properties: {
-    channel: { type: 'string' }, country: { type: 'string' },
-    start_date: { type: 'string' }, end_date: { type: 'string' },
-    budget: { type: 'number' }, cpm_goal: { type: 'number' },
-    primary_kpi: { type: 'string' }, secondary_kpi: { type: 'string' },
-    status: { type: 'string' }, notes: { type: 'string' }, ttd_campaign_id: { type: 'string' },
-  },
+// 每次工具调用前重读磁盘，再执行业务函数，结果包成 MCP 文本响应。
+function fresh<A>(fn: (a: A) => unknown) {
+  return async (a: A) => {
+    db.reloadFromDisk()
+    return json(fn(a))
+  }
 }
-const dataSchema = {
-  type: 'object', required: ['name', 'client'],
-  properties: {
-    name: { type: 'string' }, client: { type: 'string' }, agency: { type: 'string' },
-    status: { type: 'string' }, notes: { type: 'string' },
-  },
+
+const lineShape = {
+  channel: z.string(),
+  country: z.string().optional(),
+  start_date: z.string(),
+  end_date: z.string(),
+  budget: z.number().optional(),
+  cpm_goal: z.number().optional(),
+  primary_kpi: z.string(),
+  secondary_kpi: z.string().optional(),
+  status: z.string().optional(),
+  notes: z.string().optional(),
+  ttd_campaign_id: z.string().optional(),
 }
+const lineSchema = z.object(lineShape)
+const dataSchema = z.object({
+  name: z.string(),
+  client: z.string(),
+  agency: z.string().optional(),
+  status: z.string().optional(),
+  notes: z.string().optional(),
+})
 
 export function buildServer(): McpServer {
   const server = new McpServer({ name: 'campaign-tracker', version: '0.1.0' })
 
   server.tool('list_campaigns', 'List all campaigns with whether they have performance data.',
-    {}, async () => json(listCampaignsTool()))
+    {}, fresh(() => listCampaignsTool()))
 
   server.tool('get_campaign', 'Get one campaign with its lines, flights and deals.',
-    { id: { type: 'number' } }, async (a: any) => json(getCampaignTool(a)))
+    { id: z.number() }, fresh(getCampaignTool))
 
   server.tool('find_campaign', 'Fuzzy-find campaigns by name, client or TTD campaign id.',
-    { query: { type: 'string' } }, async (a: any) => json(findCampaignTool(a)))
+    { query: z.string() }, fresh(findCampaignTool))
 
   server.tool('query_performance', 'Query performance rows for a campaign, optional date range.',
-    { campaign_id: { type: 'number' }, from: { type: 'string' }, to: { type: 'string' } },
-    async (a: any) => json(queryPerformanceTool(a)))
+    { campaign_id: z.number(), from: z.string().optional(), to: z.string().optional() },
+    fresh(queryPerformanceTool))
 
   server.tool('create_campaign', 'Create a campaign. Requires name, client and at least one line.',
-    { data: dataSchema, lines: { type: 'array', items: lineSchema } },
-    async (a: any) => json(createCampaignTool(a)))
+    { data: dataSchema, lines: z.array(lineSchema) },
+    fresh(createCampaignTool))
 
   server.tool('update_campaign', 'Replace a campaign and its lines. Requires id.',
-    { id: { type: 'number' }, data: dataSchema, lines: { type: 'array', items: lineSchema } },
-    async (a: any) => json(updateCampaignTool(a)))
+    { id: z.number(), data: dataSchema, lines: z.array(lineSchema) },
+    fresh(updateCampaignTool))
 
   server.tool('preview_import', 'Parse a TTD Excel/CSV and report column mapping WITHOUT writing.',
-    { file_path: { type: 'string' } }, async (a: any) => json(previewImportTool(a)))
+    { file_path: z.string() }, fresh(previewImportTool))
 
   server.tool('import_performance', 'Import performance data from a file into a campaign line (replaces existing rows for that line).',
     {
-      campaign_id: { type: 'number' }, campaign_line_id: { type: 'number' },
-      file_path: { type: 'string' }, keep_zero_impressions: { type: 'boolean' },
+      campaign_id: z.number(), campaign_line_id: z.number(),
+      file_path: z.string(), keep_zero_impressions: z.boolean().optional(),
     },
-    async (a: any) => json(importPerformanceTool(a)))
+    fresh(importPerformanceTool))
 
   return server
 }
 ```
-> 注：`@modelcontextprotocol/sdk` 的 `server.tool(name, description, schema, handler)` 形参以实际安装版本为准；若该版本要求 zod schema，则把上面的 JSON schema 改为等价 zod 定义（`import { z } from 'zod'`，根 node_modules 已随 SDK 提供）。实现时先 `node -e "console.log(require('@modelcontextprotocol/sdk/package.json').version)"` 确认版本再定 schema 写法。
+> 实现前先确认 SDK 主版本：`node -e "console.log(require('@modelcontextprotocol/sdk/package.json').version)"`。若为 1.x，上面写法即正确；若装到 0.x（旧 API），把 `server.tool(...)` 改为对应版本签名，但 schema 仍用 zod raw shape。
 
 - [ ] **Step 2: 创建 `mcp/src/index.ts`**
 
@@ -1037,34 +1079,35 @@ main().catch(err => {
   process.exit(1)
 })
 ```
+（注意：全程只用 `console.error`，stdout 留给 JSON-RPC 协议。）
 
-- [ ] **Step 3: 构建**
+- [ ] **Step 3: 类型检查**
 
 Run:
 ```bash
-cd mcp && npm run build && cd ..
+cd mcp && npm run typecheck && cd ..
 ```
-Expected: 生成 `mcp/dist/index.js`，无类型错误。（若报 SDK API 不符，按 Step 1 注释调整 schema 写法后重试。）
+Expected: 无类型错误。（运行时不需要编译，`tsx` 直接执行源码。）
 
-- [ ] **Step 4: 冒烟测试 server 能启动并列出工具**
+- [ ] **Step 4: 冒烟测试 server 能启动并连上 db**
 
-Run（在仓库根，先确保 dev 版应用至少跑过一次以生成 db，或临时建一个空 db）：
+先准备一个可用 db（dev 版 app 跑过一次即生成，或临时建空文件让探测命中），然后启动 server，确认它**启动并打印 db 路径**即可——行为正确性已由 vitest 工具测试覆盖，这里不手动走 JSON-RPC 握手（裸发 `tools/list` 不先 `initialize` 会挂起）。
+
 ```bash
-CAMPAIGN_TRACKER_DB="$HOME/Library/Application Support/campaign-tracker/campaign-tracker.db" \
-  node mcp/dist/index.js <<'EOF'
-{"jsonrpc":"2.0","id":1,"method":"tools/list"}
-EOF
+# 临时建一个空 db 让路径探测命中（若真实 db 已存在可跳过）
+TMPDB="$(mktemp -d)/campaign-tracker.db"; : > "$TMPDB"
+CAMPAIGN_TRACKER_DB="$TMPDB" timeout 5 npx tsx mcp/src/index.ts < /dev/null 2>&1 | head -5
 ```
-Expected: stderr 打印 `using db:` 行；stdout 返回包含 8 个工具的 JSON-RPC 响应。（若 db 文件不存在会明确报错提示设置环境变量——属预期。）
+Expected: 输出包含 `[campaign-tracker-mcp] using db: ...` 一行，进程在 stdin 关闭/超时后退出，无栈报错。
 
-- [ ] **Step 5: 创建 `.mcp.json`（Claude Code）**
+- [ ] **Step 5: 创建 `.mcp.json`（Claude Code，项目级）**
 
 ```json
 {
   "mcpServers": {
     "campaign-tracker": {
-      "command": "node",
-      "args": ["./mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["tsx", "./mcp/src/index.ts"],
       "env": {
         "CAMPAIGN_TRACKER_DB": "${HOME}/Library/Application Support/campaign-tracker/campaign-tracker.db"
       }
@@ -1076,15 +1119,16 @@ Expected: stderr 打印 `using db:` 行；stdout 返回包含 8 个工具的 JSO
 - [ ] **Step 6: 创建 `mcp/README.md`**
 
 写明：
-- 构建：`cd mcp && npm install && npm run build`
-- 写操作前 app 最好关闭；写完**重启 app** 才能看到改动；每次写会自动备份 `campaign-tracker-before-mcp-*.db`。
+- 安装：`cd mcp && npm install`（运行用 `tsx`，无需构建步骤）。
+- **使用前提**：写操作时 app 最好关闭；写完**重启 app** 才能看到改动；每次写会在 db 同目录自动备份 `campaign-tracker-before-mcp-*.db`（可定期清理）。
+- 说明读工具（list/get/find/query）也可能因状态自动同步而写盘——这与 app 自身逻辑一致、幂等；配合"写时 app 别开着"即无副作用。
 - 8 个工具一览（名称 + 一句话）。
 - Claude Code：仓库已带 `.mcp.json`，在该目录启动 Claude Code 即自动加载。
 - Codex：在 `~/.codex/config.toml` 加：
 ```toml
 [mcp_servers.campaign-tracker]
-command = "node"
-args = ["/Users/derrick/Desktop/Campaign-Tracker/mcp/dist/index.js"]
+command = "npx"
+args = ["tsx", "/Users/derrick/Desktop/Campaign-Tracker/mcp/src/index.ts"]
 env = { CAMPAIGN_TRACKER_DB = "/Users/derrick/Library/Application Support/campaign-tracker/campaign-tracker.db" }
 ```
 
@@ -1115,6 +1159,14 @@ git commit -m "feat(mcp): wire stdio server, tool registration and client config
 - 两端配置 → Task 9 Step 5/6 ✅
 - 测试 → 每个 core/mcp 模块均有 vitest 测试 ✅
 
-**Placeholder scan:** 无 TBD/TODO；唯一"按实际版本确认"的点（SDK schema 写法）已给出确认命令与 fallback，非占位。
+**Placeholder scan:** 无 TBD/TODO。SDK schema 已定为 zod raw shape（非待定），仅保留一条"确认 SDK 主版本"的命令作为防御，不影响主路径。
 
-**Type consistency:** `initDb({dbPath, wasmPath})`、`createCampaign(data, lines)`、`importPerformance(opts, rows)`、`parseFile(filePath)`、`getImportMapping/mapRow`、`resolveDbPath/resolveWasmPath`、各 `*Tool` 命名在任务间一致。共享层 API 名称与现有 `database.ts` 保持一致，`ipc-handlers.ts` 调用点无需改动。
+**Type consistency:** `initDb({dbPath, wasmPath})`、`reloadFromDisk()`、`createCampaign(data, lines)`、`importPerformance(opts, rows)`、`parseFile(filePath)`、`getImportMapping/mapRow`、`resolveDbPath/resolveWasmPath`、各 `*Tool` 命名在任务间一致。共享层 API 名称与现有 `database.ts` 保持一致，`ipc-handlers.ts` 调用点无需改动。
+
+**Self-challenge 修正记录（已并入计划）：**
+1. MCP SDK schema 改用 zod raw shape（原 JSON Schema 会报错）— Task 9。
+2. sql.js 改 ESM 默认导入（原 `require` 在 vitest 下崩）— Task 2。
+3. 放弃 tsc 构建改用 `tsx`（原 `rootDir:".."` 产物嵌套破坏入口）— Task 5/9。
+4. 新增 `reloadFromDisk()` 且每次工具调用前重读（原内存缓存导致 AI 看不到 app 新数据，破坏 insert/update 判断）— Task 2/9。
+5. 共享层 `console.log` → `console.error`（原会污染 stdio 协议）— Task 2。
+6. 冒烟测试改为只验证启动（原裸发 `tools/list` 不握手会挂起）— Task 9。
