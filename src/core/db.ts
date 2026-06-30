@@ -595,7 +595,17 @@ function insertCampaignLines(campaignId: number, lines: Array<Omit<CampaignLine,
 }
 
 export function deleteCampaign(id: number): boolean {
-  run('DELETE FROM campaigns WHERE id = ?', [id])
+  // FK ON DELETE CASCADE is unreliable under sql.js (cascade action does not
+  // fire after export()/reload), so delete children explicitly, then the
+  // campaign, flushing once for atomicity (a crash before save() leaves the
+  // file untouched).
+  const d = getDb()
+  d.run('DELETE FROM performance_data WHERE campaign_id = ?', [id])
+  d.run('DELETE FROM flights WHERE campaign_id = ?', [id])
+  d.run('DELETE FROM deals WHERE campaign_id = ?', [id])
+  d.run('DELETE FROM campaign_lines WHERE campaign_id = ?', [id])
+  d.run('DELETE FROM campaigns WHERE id = ?', [id])
+  save()
   return true
 }
 

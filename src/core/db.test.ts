@@ -101,4 +101,21 @@ describe('core/db', () => {
   it('deleteCampaignLine returns false for a non-existent line', () => {
     expect(db.deleteCampaignLine(987654)).toBe(false)
   })
+
+  it('deleteCampaign leaves no orphan campaign_lines, performance_data, or campaign row', () => {
+    const c = db.createCampaign({ name: 'Orphan Co', client: 'O' } as any,
+      [{ channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any])
+    const lineId = c.lines![0].id
+    db.importPerformance(
+      { campaign_id: c.id, campaign_line_id: lineId, file_path: '', keep_zero_impressions: false },
+      [{ campaign_id: c.id, date: '2026-07-02', impressions: 999 } as any]
+    )
+    expect(db.deleteCampaign(c.id)).toBe(true)
+    // Campaign row gone
+    expect(db.getCampaign(c.id)).toBeUndefined()
+    // Performance rows gone
+    expect(db.queryPerformance(c.id).length).toBe(0)
+    // No orphan campaign_lines: getCampaignLineSummary must return undefined
+    expect(db.getCampaignLineSummary(lineId)).toBeUndefined()
+  })
 })

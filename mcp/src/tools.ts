@@ -128,9 +128,7 @@ export function deleteCampaignTool(args: { id: number; confirm_token?: string })
   }
   consumeToken(args.confirm_token, 'campaign', args.id)
   backupBeforeWrite()
-  // FK cascade is not reliable in sql.js (export() resets PRAGMA foreign_keys).
-  // Explicitly clear related data before deleting the campaign row.
-  db.deletePerformanceData(args.id)
+  // core deleteCampaign cascades children explicitly (sql.js FK is unreliable)
   db.deleteCampaign(args.id)
   return { deleted: { type: 'campaign', id: args.id, name: c.name }, note: RESTART_NOTE }
 }
