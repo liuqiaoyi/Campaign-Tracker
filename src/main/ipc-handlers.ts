@@ -3,12 +3,10 @@ import { IPC } from '../shared/ipc-channels'
 import * as db from './database'
 import type { IpcResponse, Campaign, CampaignLine, ImportOptions } from '../shared/types'
 import { getImportMapping, mapRow } from '../core/import-mapping'
+import { parseFile } from '../core/parse-file'
 import fs from 'fs'
 import https from 'https'
 import path from 'path'
-// xlsx: use require() to guarantee CJS export shape { readFile, utils, ... }
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const XLSX = require('xlsx') as typeof import('xlsx')
 
 function ok<T>(data: T): IpcResponse<T> { return { success: true, data } }
 function err(error: unknown): IpcResponse { return { success: false, error: String(error) } }
@@ -102,22 +100,7 @@ export function registerHandlers(): void {
 
   // File parsing - returns raw rows + zero impression count for preview
   ipcMain.handle('dialog:parseFile', async (_e, filePath: string) => {
-    try {
-      const workbook = XLSX.readFile(filePath)
-      const sheet = workbook.Sheets[workbook.SheetNames[0]]
-      const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { raw: true })
-      const columns = rows.length > 0 ? Object.keys(rows[0]) : []
-      const mapping = getImportMapping(columns)
-      const zero_impression_rows = rows.filter((r: Record<string, unknown>) => (mapRow(r, 0).impressions || 0) === 0).length
-      return ok({
-        columns,
-        rows,
-        zero_impression_rows,
-        total_rows: rows.length,
-        mapped_columns: mapping.mapped,
-        missing_required_columns: mapping.missingRequired,
-      })
-    } catch (e) { return err(e) }
+    try { return ok(parseFile(filePath)) } catch (e) { return err(e) }
   })
 
   // DB Backup / Restore (data lives in userData/campaign-tracker.db)
