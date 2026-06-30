@@ -1,5 +1,7 @@
 import * as db from '../../src/core/db'
 import * as path from 'path'
+import { parseFile } from '../../src/core/parse-file'
+import { getImportMapping, mapRow } from '../../src/core/import-mapping'
 
 export function listCampaignsTool() {
   return db.listCampaignsWithDataStatus()
@@ -54,4 +56,33 @@ export function updateCampaignTool(args: { id: number; data: any; lines: any[] }
   backupBeforeWrite()
   const campaign = db.updateCampaign(args.id, args.data, args.lines)
   return { campaign, note: RESTART_NOTE }
+}
+
+export function previewImportTool(args: { file_path: string }) {
+  return parseFile(args.file_path)
+}
+
+export function importPerformanceTool(args: {
+  campaign_id: number
+  campaign_line_id: number
+  file_path: string
+  keep_zero_impressions?: boolean
+}) {
+  const parsed = parseFile(args.file_path)
+  const mapping = getImportMapping(parsed.columns)
+  if (mapping.missingRequired.length > 0) {
+    throw new Error(`Missing required columns: ${mapping.missingRequired.join(', ')}`)
+  }
+  backupBeforeWrite()
+  const rows = parsed.rows.map(r => mapRow(r, args.campaign_id))
+  const result = db.importPerformance(
+    {
+      campaign_id: args.campaign_id,
+      campaign_line_id: args.campaign_line_id,
+      file_path: args.file_path,
+      keep_zero_impressions: args.keep_zero_impressions ?? false,
+    },
+    rows
+  )
+  return { result, note: RESTART_NOTE }
 }
