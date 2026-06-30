@@ -55,4 +55,50 @@ describe('core/db', () => {
       )
     }).toThrow()
   })
+
+  it('getCampaignLineSummary reports sibling and performance counts', () => {
+    const c = db.createCampaign({ name: 'LineSum Co', client: 'L' } as any, [
+      { channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any,
+      { channel: 'Display', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'VCR' } as any,
+    ])
+    const lineId = c.lines![0].id
+    db.importPerformance(
+      { campaign_id: c.id, campaign_line_id: lineId, file_path: '', keep_zero_impressions: false },
+      [{ campaign_id: c.id, date: '2026-07-02', impressions: 1000 } as any]
+    )
+    const sum = db.getCampaignLineSummary(lineId)
+    expect(sum?.campaign_id).toBe(c.id)
+    expect(sum?.campaign_name).toBe('LineSum Co')
+    expect(sum?.line_count).toBe(2)
+    expect(sum?.performance_rows).toBe(1)
+    expect(db.getCampaignLineSummary(999999)).toBeUndefined()
+  })
+
+  it('deleteCampaignLine removes a non-last line and cascades its performance', () => {
+    const c = db.createCampaign({ name: 'DelLine Co', client: 'D' } as any, [
+      { channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any,
+      { channel: 'Display', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'VCR' } as any,
+    ])
+    const lineId = c.lines![0].id
+    db.importPerformance(
+      { campaign_id: c.id, campaign_line_id: lineId, file_path: '', keep_zero_impressions: false },
+      [{ campaign_id: c.id, date: '2026-07-02', impressions: 500 } as any]
+    )
+    expect(db.deleteCampaignLine(lineId)).toBe(true)
+    const after = db.getCampaign(c.id)
+    expect(after?.lines?.length).toBe(1)
+    expect(after?.lines?.[0].channel).toBe('Display')
+    expect(db.queryPerformance(c.id).length).toBe(0)
+  })
+
+  it('deleteCampaignLine refuses to delete the last line', () => {
+    const c = db.createCampaign({ name: 'LastLine Co', client: 'L' } as any,
+      [{ channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any])
+    expect(() => db.deleteCampaignLine(c.lines![0].id)).toThrow(/last line/i)
+    expect(db.getCampaign(c.id)?.lines?.length).toBe(1)
+  })
+
+  it('deleteCampaignLine returns false for a non-existent line', () => {
+    expect(db.deleteCampaignLine(987654)).toBe(false)
+  })
 })

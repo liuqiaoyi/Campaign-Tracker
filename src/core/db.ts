@@ -599,6 +599,40 @@ export function deleteCampaign(id: number): boolean {
   return true
 }
 
+export function deleteCampaignLine(line_id: number): boolean {
+  const row = queryOne<{ campaign_id: number }>('SELECT campaign_id FROM campaign_lines WHERE id = ?', [line_id])
+  if (!row) return false
+  const line_count = queryOne<{ cnt: number }>(
+    'SELECT COUNT(*) as cnt FROM campaign_lines WHERE campaign_id = ?', [row.campaign_id])?.cnt ?? 0
+  if (line_count <= 1) {
+    throw new Error('Cannot delete the last line of a campaign. Use delete_campaign to remove the whole campaign instead.')
+  }
+  // Delete related rows explicitly, then the line, flushing once for atomicity:
+  // performance_data uses ON DELETE SET NULL (would orphan, not remove) and existing
+  // DBs may predate the line FKs, so cascade is not reliable here. Spec requires the
+  // line's performance/flights/deals be removed. One save() = all-or-nothing on disk.
+  const d = getDb()
+  d.run('DELETE FROM performance_data WHERE campaign_line_id = ?', [line_id])
+  d.run('DELETE FROM flights WHERE campaign_line_id = ?', [line_id])
+  d.run('DELETE FROM deals WHERE campaign_line_id = ?', [line_id])
+  d.run('DELETE FROM campaign_lines WHERE id = ?', [line_id])
+  save()
+  return true
+}
+
+export function getCampaignLineSummary(line_id: number):
+  { line_id: number; campaign_id: number; campaign_name: string; channel: string; line_count: number; performance_rows: number } | undefined {
+  const row = queryOne<{ campaign_id: number; channel: string }>(
+    'SELECT campaign_id, channel FROM campaign_lines WHERE id = ?', [line_id])
+  if (!row) return undefined
+  const campaign = queryOne<{ name: string }>('SELECT name FROM campaigns WHERE id = ?', [row.campaign_id])
+  const line_count = queryOne<{ cnt: number }>(
+    'SELECT COUNT(*) as cnt FROM campaign_lines WHERE campaign_id = ?', [row.campaign_id])?.cnt ?? 0
+  const performance_rows = queryOne<{ cnt: number }>(
+    'SELECT COUNT(*) as cnt FROM performance_data WHERE campaign_line_id = ?', [line_id])?.cnt ?? 0
+  return { line_id, campaign_id: row.campaign_id, campaign_name: campaign?.name ?? '', channel: row.channel, line_count, performance_rows }
+}
+
 // ── Performance ───────────────────────────────────────────────────────────────
 
 export function queryPerformance(campaign_id: number, from?: string, to?: string): PerformanceData[] {
