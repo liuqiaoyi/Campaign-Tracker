@@ -7,7 +7,8 @@ import * as fs from 'fs'
 import * as path from 'path'
 import type { Campaign, CampaignLine, CampaignStatus, Deal, Flight, PerformanceData, ImportOptions, ImportResult } from '../shared/types'
 
-// @ts-expect-error - sql.js ships no bundled types
+// @ts-ignore - sql.js ships no bundled types (use ts-ignore so it stays valid
+// whether or not the active tsconfig surfaces the missing-types error)
 import initSqlJs from 'sql.js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
