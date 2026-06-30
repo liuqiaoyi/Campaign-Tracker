@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "campaign-tracker": {
+      "command": "npx",
+      "args": ["tsx", "./mcp/src/index.ts"],
+      "env": {
+        "CAMPAIGN_TRACKER_DB": "${HOME}/Library/Application Support/campaign-tracker/campaign-tracker.db"
+      }
+    }
+  }
+}
