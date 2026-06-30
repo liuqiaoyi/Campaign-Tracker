@@ -7,8 +7,9 @@ import * as db from './db'
 const wasmPath = path.join(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm')
 
 describe('core/db', () => {
+  let dbPath: string
   beforeAll(async () => {
-    const dbPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ct-')), 'test.db')
+    dbPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ct-')), 'test.db')
     await db.initDb({ dbPath, wasmPath })
   })
 
@@ -34,5 +35,24 @@ describe('core/db', () => {
     expect(res.imported_rows).toBe(1)
     const rows = db.queryPerformance(c.id)
     expect(rows[0].impressions).toBe(1000)
+  })
+
+  it('reloadFromDisk preserves FK enforcement: inserting orphan row throws', () => {
+    // Save something so the db file exists on disk.
+    db.createCampaign({ name: 'FK Test Campaign', client: 'FK' } as any,
+      [{ channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any])
+
+    // Reload the db from disk — this is what MCP does before every tool call.
+    db.reloadFromDisk()
+
+    // After reload, FK enforcement must still be ON.
+    // Attempt to insert a performance_data row with a non-existent campaign_line_id.
+    // If FK is OFF this silently succeeds; if FK is ON it throws.
+    expect(() => {
+      db.importPerformance(
+        { campaign_id: 99999, campaign_line_id: 99999, file_path: '', keep_zero_impressions: true },
+        [{ campaign_id: 99999, campaign_line_id: 99999, date: '2026-07-01', impressions: 1 } as any]
+      )
+    }).toThrow()
   })
 })

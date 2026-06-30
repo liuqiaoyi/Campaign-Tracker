@@ -73,6 +73,12 @@ export function importPerformanceTool(args: {
   if (mapping.missingRequired.length > 0) {
     throw new Error(`Missing required columns: ${mapping.missingRequired.join(', ')}`)
   }
+  // Validate that the line belongs to the campaign before any destructive write.
+  const campaign = db.getCampaign(args.campaign_id)
+  if (!campaign) throw new Error(`Campaign ${args.campaign_id} not found`)
+  if (!campaign.lines?.some(l => l.id === args.campaign_line_id)) {
+    throw new Error(`Campaign line ${args.campaign_line_id} does not belong to campaign ${args.campaign_id}`)
+  }
   backupBeforeWrite()
   const rows = parsed.rows.map(r => mapRow(r, args.campaign_id))
   const result = db.importPerformance(

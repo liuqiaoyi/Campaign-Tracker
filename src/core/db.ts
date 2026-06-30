@@ -80,7 +80,7 @@ function queryOne<T>(sql: string, params: unknown[] = []): T | undefined {
 
 function createSchema() {
   const db = getDb()
-  db.run(`PRAGMA foreign_keys = ON`)
+  // Note: PRAGMA foreign_keys = ON is set in loadFromDisk() for every connection.
   db.run(`
     CREATE TABLE IF NOT EXISTS campaigns (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -276,6 +276,9 @@ function loadFromDisk(): void {
   } else {
     _db = new _SQL.Database()
   }
+  // Foreign-key enforcement is connection-level and defaults to OFF in SQLite.
+  // Set it here so every connection (initDb + reloadFromDisk) has FK ON.
+  _db.run('PRAGMA foreign_keys = ON')
 }
 
 export async function initDb(opts: { dbPath: string; wasmPath: string }): Promise<void> {
@@ -518,7 +521,8 @@ export function importPerformance(opts: ImportOptions, rows: PerformanceData[]):
   const db = getDb()
   // Delete existing data for this campaign line before importing. Fallback to campaign-level delete for legacy imports.
   if (opts.campaign_line_id) {
-    db.run('DELETE FROM performance_data WHERE campaign_line_id = ?', [opts.campaign_line_id])
+    // Include campaign_id to prevent cross-campaign data deletion (defense-in-depth).
+    db.run('DELETE FROM performance_data WHERE campaign_line_id = ? AND campaign_id = ?', [opts.campaign_line_id, opts.campaign_id])
   } else {
     db.run('DELETE FROM performance_data WHERE campaign_id = ?', [opts.campaign_id])
   }

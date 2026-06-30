@@ -29,12 +29,17 @@ function missingColumnsFixture(dir: string): string {
 
 describe('mcp import tools', () => {
   let dir: string, campaignId: number, lineId: number
+  let campaignBId: number, lineBId: number
   beforeAll(async () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ct-it-'))
     await db.initDb({ dbPath: path.join(dir, 'test.db'), wasmPath })
     const c = db.createCampaign({ name: 'Imp Co', client: 'I' } as any,
       [{ channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'VCR' } as any])
     campaignId = c.id; lineId = c.lines![0].id
+    // Second campaign for cross-campaign ownership test
+    const cB = db.createCampaign({ name: 'Other Co', client: 'O' } as any,
+      [{ channel: 'Display', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any])
+    campaignBId = cB.id; lineBId = cB.lines![0].id
   })
 
   it('preview reports columns without writing', () => {
@@ -62,5 +67,22 @@ describe('mcp import tools', () => {
     importPerformanceTool({ campaign_id: campaignId, campaign_line_id: lineId, file_path: fp })
     const count2 = db.queryPerformance(campaignId).length
     expect(count2).toBe(count1)
+  })
+
+  it('rejects import when campaign_line_id belongs to a different campaign', () => {
+    // Seed performance data for campaign B's line so we can verify it survives.
+    const fp = fixture(dir)
+    importPerformanceTool({ campaign_id: campaignBId, campaign_line_id: lineBId, file_path: fp })
+    const beforeCount = db.queryPerformance(campaignBId).length
+    expect(beforeCount).toBeGreaterThan(0)
+
+    // Attempt to import using campaign A's id but campaign B's line id.
+    // This must throw BEFORE any destructive delete occurs.
+    expect(() => {
+      importPerformanceTool({ campaign_id: campaignId, campaign_line_id: lineBId, file_path: fp })
+    }).toThrow(/does not belong/i)
+
+    // Campaign B's data must be intact — the validation fired before any DELETE.
+    expect(db.queryPerformance(campaignBId).length).toBe(beforeCount)
   })
 })
