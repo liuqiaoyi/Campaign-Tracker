@@ -123,10 +123,14 @@ export function deleteCampaignTool(args: { id: number; confirm_token?: string })
   if (!args.confirm_token) {
     const lineCount = c.lines?.length ?? 0
     const perfRows = db.queryPerformance(args.id).length
+    const fp = `${lineCount}:${perfRows}`
     const preview = `Will DELETE campaign '${c.name}' (id ${args.id}) and its ${lineCount} line(s) and ${perfRows} performance row(s). Cascades; cannot be undone via MCP.`
-    return { preview, confirm_token: issueToken('campaign', args.id, preview), requires_confirmation: true }
+    return { preview, confirm_token: issueToken('campaign', args.id, preview, fp), requires_confirmation: true }
   }
-  consumeToken(args.confirm_token, 'campaign', args.id)
+  const current = db.getCampaign(args.id)
+  if (!current) throw new Error(`Campaign ${args.id} not found`)
+  const fp = `${current.lines?.length ?? 0}:${db.queryPerformance(args.id).length}`
+  consumeToken(args.confirm_token, 'campaign', args.id, fp)
   backupBeforeWrite()
   // core deleteCampaign cascades children explicitly (sql.js FK is unreliable)
   db.deleteCampaign(args.id)
@@ -141,10 +145,14 @@ export function deleteCampaignLineTool(args: { line_id: number; confirm_token?: 
       // Refuse at preview: issue no token so the AI must report this to the user.
       throw new Error(`Campaign line ${args.line_id} ('${summary.channel}') is the last line of campaign '${summary.campaign_name}'. Use delete_campaign to remove the whole campaign instead.`)
     }
+    const fp = `${summary.line_count}:${summary.performance_rows}`
     const preview = `Will DELETE campaign line ${args.line_id} ('${summary.channel}') of campaign '${summary.campaign_name}' and its ${summary.performance_rows} performance row(s). Cascades; cannot be undone via MCP.`
-    return { preview, confirm_token: issueToken('campaign_line', args.line_id, preview), requires_confirmation: true }
+    return { preview, confirm_token: issueToken('campaign_line', args.line_id, preview, fp), requires_confirmation: true }
   }
-  consumeToken(args.confirm_token, 'campaign_line', args.line_id)
+  const currentSummary = db.getCampaignLineSummary(args.line_id)
+  if (!currentSummary) throw new Error(`Campaign line ${args.line_id} not found`)
+  const fp = `${currentSummary.line_count}:${currentSummary.performance_rows}`
+  consumeToken(args.confirm_token, 'campaign_line', args.line_id, fp)
   backupBeforeWrite()
   db.deleteCampaignLine(args.line_id) // core re-validates the last-line rule (authoritative)
   return { deleted: { type: 'campaign_line', line_id: args.line_id, campaign_id: summary.campaign_id }, note: RESTART_NOTE }
@@ -155,10 +163,12 @@ export function deletePerformanceTool(args: { campaign_id: number; confirm_token
   if (!c) throw new Error(`Campaign ${args.campaign_id} not found`)
   if (!args.confirm_token) {
     const perfRows = db.queryPerformance(args.campaign_id).length
+    const fp = `${perfRows}`
     const preview = `Will DELETE all ${perfRows} performance row(s) for campaign '${c.name}' (id ${args.campaign_id}). Campaign and line structure are kept.`
-    return { preview, confirm_token: issueToken('performance', args.campaign_id, preview), requires_confirmation: true }
+    return { preview, confirm_token: issueToken('performance', args.campaign_id, preview, fp), requires_confirmation: true }
   }
-  consumeToken(args.confirm_token, 'performance', args.campaign_id)
+  const fp = `${db.queryPerformance(args.campaign_id).length}`
+  consumeToken(args.confirm_token, 'performance', args.campaign_id, fp)
   backupBeforeWrite()
   const rows = db.deletePerformanceData(args.campaign_id)
   return { deleted: { type: 'performance', campaign_id: args.campaign_id, rows }, note: RESTART_NOTE }

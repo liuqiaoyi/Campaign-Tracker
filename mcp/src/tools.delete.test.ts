@@ -49,6 +49,28 @@ describe('mcp delete tools', () => {
     expect(() => deleteCampaignTool({ id: 424242 })).toThrow(/not found/i)
   })
 
+  it('delete_campaign rejects stale token when new performance rows imported after preview', () => {
+    const c = db.createCampaign({ name: 'Stale Camp', client: 'S' } as any,
+      [{ channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any])
+    // No perf rows yet — preview sees 1 line : 0 perf rows
+    const preview = deleteCampaignTool({ id: c.id }) as any
+    expect(preview.requires_confirmation).toBe(true)
+
+    // Mutate: import a performance row after the preview was issued
+    db.importPerformance(
+      { campaign_id: c.id, campaign_line_id: c.lines![0].id, file_path: '', keep_zero_impressions: false },
+      [{ campaign_id: c.id, date: '2026-07-02', impressions: 5000 } as any]
+    )
+
+    // Execute with the now-stale token — must throw changed|stale
+    expect(() => deleteCampaignTool({ id: c.id, confirm_token: preview.confirm_token })).toThrow(/changed|stale/i)
+
+    // No backup created, campaign still exists
+    expect(backupCount()).toBe(0)
+    expect(db.getCampaign(c.id)).toBeTruthy()
+    expect(db.queryPerformance(c.id).length).toBe(1)
+  })
+
   it('delete_campaign_line deletes a non-last line with token', () => {
     const c = db.createCampaign({ name: 'Line Co', client: 'L' } as any, [
       { channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any,
@@ -87,5 +109,36 @@ describe('mcp delete tools', () => {
     expect(db.queryPerformance(c.id).length).toBe(0)
     expect(db.getCampaign(c.id)?.lines?.length).toBe(1) // structure kept
     expect(backupCount()).toBe(1)                    // execution backed up
+  })
+
+  it('delete_performance rejects stale token when new rows imported after preview', () => {
+    const c = db.createCampaign({ name: 'Stale Perf', client: 'SP' } as any, [
+      { channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any,
+      { channel: 'Display', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'VCR' } as any,
+    ])
+    // Import a row for line[0] first
+    db.importPerformance(
+      { campaign_id: c.id, campaign_line_id: c.lines![0].id, file_path: '', keep_zero_impressions: false },
+      [{ campaign_id: c.id, date: '2026-07-02', impressions: 1000 } as any]
+    )
+
+    // Preview sees 1 perf row (fingerprint "1")
+    const preview = deletePerformanceTool({ campaign_id: c.id }) as any
+    expect(preview.requires_confirmation).toBe(true)
+    expect(db.queryPerformance(c.id).length).toBe(1)
+
+    // Mutate: import a row for a DIFFERENT line after preview → total becomes 2 (fingerprint "2")
+    db.importPerformance(
+      { campaign_id: c.id, campaign_line_id: c.lines![1].id, file_path: '', keep_zero_impressions: false },
+      [{ campaign_id: c.id, date: '2026-07-03', impressions: 2000 } as any]
+    )
+    expect(db.queryPerformance(c.id).length).toBe(2)
+
+    // Execute with stale token — must throw changed|stale
+    expect(() => deletePerformanceTool({ campaign_id: c.id, confirm_token: preview.confirm_token })).toThrow(/changed|stale/i)
+
+    // No backup, data intact
+    expect(backupCount()).toBe(0)
+    expect(db.queryPerformance(c.id).length).toBe(2)
   })
 })
