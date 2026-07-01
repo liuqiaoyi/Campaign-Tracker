@@ -451,7 +451,14 @@ export function updateCampaign(
       id,
     ]
   )
-  // Replace lines; cascading deletes their flights/deals.
+  // Replace lines. sql.js FK cascade/SET-NULL does not fire reliably, so apply
+  // the same effects explicitly: delete the old lines' flights/deals, and null
+  // out their performance_data.campaign_line_id (that FK is ON DELETE SET NULL —
+  // performance history is kept, only the line link is cleared). Then delete the
+  // lines and re-insert. Single trailing save() keeps this atomic on disk.
+  db.run('DELETE FROM flights WHERE campaign_id = ?', [id])
+  db.run('DELETE FROM deals WHERE campaign_id = ?', [id])
+  db.run('UPDATE performance_data SET campaign_line_id = NULL WHERE campaign_id = ?', [id])
   db.run('DELETE FROM campaign_lines WHERE campaign_id = ?', [id])
   insertCampaignLines(id, lines)
   save()

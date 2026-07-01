@@ -140,4 +140,40 @@ describe('core/db', () => {
     expect(scopedCount('deals')).toBe(0)
     raw.close()
   })
+
+  it('updateCampaign replaces lines without leaving orphan flights/deals, and keeps performance (line link nulled)', async () => {
+    const c = db.createCampaign({ name: 'Upd Co', client: 'U' } as any, [
+      {
+        channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR',
+        flights: [{ flight_name: 'F1', start_date: '2026-07-01', end_date: '2026-07-15', budget: 1000 }],
+        deals: [{ deal_id: 'D1', deal_name: 'Deal One' }],
+      } as any,
+    ])
+    const oldLineId = c.lines![0].id
+    db.importPerformance(
+      { campaign_id: c.id, campaign_line_id: oldLineId, file_path: '', keep_zero_impressions: false },
+      [{ campaign_id: c.id, date: '2026-07-02', impressions: 777 } as any]
+    )
+    // Full-replace the lines with a different line that has no flights/deals.
+    const updated = db.updateCampaign(c.id, { name: 'Upd Co' } as any,
+      [{ channel: 'Display', start_date: '2026-08-01', end_date: '2026-08-31', primary_kpi: 'VCR' } as any])
+    // Replacement line was actually inserted (guards against a false green where
+    // insert silently no-ops and the orphan counts pass simply because all is gone).
+    expect(updated?.lines).toHaveLength(1)
+    expect(updated?.lines![0].channel).toBe('Display')
+
+    // Performance history is KEPT (not deleted), but its line link is cleared.
+    const perf = db.queryPerformance(c.id)
+    expect(perf.length).toBe(1)
+    expect(perf[0].campaign_line_id ?? null).toBeNull()
+
+    // No orphan flights/deals remain for this campaign's old line.
+    const SQL = await initSqlJs({ locateFile: () => wasmPath })
+    const raw = new SQL.Database(fs.readFileSync(dbPath))
+    const scoped = (table: string) =>
+      raw.exec(`SELECT COUNT(*) FROM ${table} WHERE campaign_id = ${c.id}`)[0].values[0][0] as number
+    expect(scoped('flights')).toBe(0)
+    expect(scoped('deals')).toBe(0)
+    raw.close()
+  })
 })
