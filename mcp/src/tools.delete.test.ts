@@ -141,4 +141,60 @@ describe('mcp delete tools', () => {
     expect(backupCount()).toBe(0)
     expect(db.queryPerformance(c.id).length).toBe(2)
   })
+
+  it('delete_performance rejects stale token on 1:1 row replacement (same count, different id)', async () => {
+    const c = db.createCampaign({ name: 'OneToOne Perf', client: 'O' } as any,
+      [{ channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any])
+    const lineId = c.lines![0].id
+
+    // Import 1 perf row — gets autoincrement id N
+    db.importPerformance(
+      { campaign_id: c.id, campaign_line_id: lineId, file_path: '', keep_zero_impressions: false },
+      [{ campaign_id: c.id, date: '2026-07-02', impressions: 1000 } as any]
+    )
+    expect(db.queryPerformance(c.id).length).toBe(1)
+
+    // Preview: fingerprint is hash of [N]
+    const preview = deletePerformanceTool({ campaign_id: c.id }) as any
+    expect(preview.requires_confirmation).toBe(true)
+
+    // 1:1 replacement: re-import same line — deletes row N, inserts row N+1; count stays 1, id changes
+    db.importPerformance(
+      { campaign_id: c.id, campaign_line_id: lineId, file_path: '', keep_zero_impressions: false },
+      [{ campaign_id: c.id, date: '2026-07-02', impressions: 2000 } as any]
+    )
+    expect(db.queryPerformance(c.id).length).toBe(1)
+
+    // Execute with stale token — content hash changed even though count is still 1
+    expect(() => deletePerformanceTool({ campaign_id: c.id, confirm_token: preview.confirm_token })).toThrow(/changed|stale/i)
+
+    // No backup, new row still present
+    expect(backupCount()).toBe(0)
+    expect(db.queryPerformance(c.id).length).toBe(1)
+  })
+
+  it('delete_campaign_line rejects stale token when perf rows imported for that line after preview', () => {
+    const c = db.createCampaign({ name: 'Line Stale Co', client: 'LS' } as any, [
+      { channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any,
+      { channel: 'Display', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'VCR' } as any,
+    ])
+    const lineId = c.lines![0].id
+
+    // Preview deleting line[0] — no perf rows yet, hash of []
+    const preview = deleteCampaignLineTool({ line_id: lineId }) as any
+    expect(preview.requires_confirmation).toBe(true)
+
+    // Import a perf row for line[0] after preview — changes the perf id set → fingerprint changes
+    db.importPerformance(
+      { campaign_id: c.id, campaign_line_id: lineId, file_path: '', keep_zero_impressions: false },
+      [{ campaign_id: c.id, date: '2026-07-02', impressions: 5000 } as any]
+    )
+
+    // Execute with stale token — must throw changed|stale
+    expect(() => deleteCampaignLineTool({ line_id: lineId, confirm_token: preview.confirm_token })).toThrow(/changed|stale/i)
+
+    // No backup, both lines still exist
+    expect(backupCount()).toBe(0)
+    expect(db.getCampaign(c.id)?.lines?.length).toBe(2)
+  })
 })
