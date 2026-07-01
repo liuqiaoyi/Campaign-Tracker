@@ -49,7 +49,7 @@
 - Consumes: 既有私有 helper `run(sql, params)`（执行并 save）、`queryOne<T>(sql, params)`。
 - Produces:
   - `deleteCampaignLine(line_id: number): boolean` — 删除单条 line（FK CASCADE 清其 performance/flights/deals）；line 不存在返回 `false`；若是该 campaign 唯一 line 则 `throw new Error('Cannot delete the last line ...')`。
-  - `getCampaignLineSummary(line_id: number): { line_id: number; campaign_id: number; campaign_name: string; channel: string; sibling_count: number; performance_rows: number } | undefined` — 只读摘要，供工具层生成预览；line 不存在返回 `undefined`。
+  - `getCampaignLineSummary(line_id: number): { line_id: number; campaign_id: number; campaign_name: string; channel: string; line_count: number; performance_rows: number } | undefined` — 只读摘要（`line_count` = 该 campaign 的 line 总数，含本条），供工具层生成预览；line 不存在返回 `undefined`。
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -408,7 +408,7 @@ export function deleteCampaignLineTool(args: { line_id: number; confirm_token?: 
   const summary = db.getCampaignLineSummary(args.line_id)
   if (!summary) throw new Error(`Campaign line ${args.line_id} not found`)
   if (!args.confirm_token) {
-    if (summary.sibling_count <= 1) {
+    if (summary.line_count <= 1) {
       // Refuse at preview: issue no token so the AI must report this to the user.
       throw new Error(`Campaign line ${args.line_id} ('${summary.channel}') is the last line of campaign '${summary.campaign_name}'. Use delete_campaign to remove the whole campaign instead.`)
     }
