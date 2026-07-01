@@ -4,6 +4,7 @@ import * as db from '../../src/core/db'
 import {
   listCampaignsTool, getCampaignTool, findCampaignTool, queryPerformanceTool,
   createCampaignTool, updateCampaignTool, previewImportTool, importPerformanceTool,
+  deleteCampaignTool, deleteCampaignLineTool, deletePerformanceTool,
 } from './tools'
 
 function json(data: unknown) {
@@ -104,6 +105,21 @@ export function buildServer(): McpServer {
       file_path: z.string(), sheet_name: z.string().optional(), keep_zero_impressions: z.boolean().optional(),
     },
     fresh(importPerformanceTool))
+
+  s.tool('delete_campaign',
+    'Delete a campaign and everything under it (lines, flights, deals, performance). TWO-STEP: call WITHOUT confirm_token first to get a preview + confirm_token; SHOW the preview to the user, get their explicit approval, THEN call again WITH the confirm_token to actually delete. Never pass confirm_token on the first call.',
+    { id: z.number(), confirm_token: z.string().optional() },
+    fresh(deleteCampaignTool))
+
+  s.tool('delete_campaign_line',
+    "Delete one campaign line and its performance data. Refuses if it is the campaign's last line (use delete_campaign instead). TWO-STEP: call WITHOUT confirm_token to preview, SHOW the user, get approval, THEN call again WITH confirm_token. Never pass confirm_token on the first call.",
+    { line_id: z.number(), confirm_token: z.string().optional() },
+    fresh(deleteCampaignLineTool))
+
+  s.tool('delete_performance',
+    'Delete ALL performance rows for a campaign (keeps the campaign and its lines). TWO-STEP: call WITHOUT confirm_token to preview, SHOW the user, get approval, THEN call again WITH confirm_token. Never pass confirm_token on the first call.',
+    { campaign_id: z.number(), confirm_token: z.string().optional() },
+    fresh(deletePerformanceTool))
 
   return s as McpServer
 }

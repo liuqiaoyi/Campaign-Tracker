@@ -44,6 +44,13 @@ The read tools (`list_campaigns`, `get_campaign`, `find_campaign`, `query_perfor
 | `update_campaign` | Patch a campaign and/or its lines; omitted existing lines are preserved |
 | `preview_import` | Parse a TTD Excel/CSV and report column mapping WITHOUT writing to the DB; optional `sheet_name` |
 | `import_performance` | Import performance data from a file into a campaign line (replaces existing rows for that line); optional `sheet_name` |
+| `delete_campaign` | Delete a campaign and all its lines/performance — two-step: preview then confirm with a token |
+| `delete_campaign_line` | Delete one line and its performance (refuses the last line) — two-step preview/confirm |
+| `delete_performance` | Delete all performance rows for a campaign (keeps structure) — two-step preview/confirm |
+
+### Deleting (two-step confirmation)
+
+Delete tools never act in one shot. Call the tool **without** `confirm_token` to get a human-readable `preview` plus a one-time `confirm_token`. The assistant must show the preview to you and get your explicit approval, then call the tool **again with** the `confirm_token` to execute. Tokens are held in memory, expire after 5 minutes, are single-use, and are bound to the exact operation and target. Every executed delete writes a `campaign-tracker-before-mcp-*.db` backup first.
 
 ## Client configuration
 

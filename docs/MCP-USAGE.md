@@ -40,7 +40,7 @@ cd mcp && npm install
 }
 ```
 
-**验证已加载**：在 Claude Code 里运行 `/mcp`，应能看到 `campaign-tracker` 及其 8 个工具。
+**验证已加载**：在 Claude Code 里运行 `/mcp`，应能看到 `campaign-tracker` 及其 11 个工具。
 
 ---
 
@@ -61,7 +61,7 @@ env = { CAMPAIGN_TRACKER_DB = "/Users/derrick/Library/Application Support/campai
 
 ---
 
-## 3. 八个工具速查
+## 3. 十一个工具速查
 
 | 类别 | 工具 | 作用 |
 |---|---|---|
@@ -73,8 +73,11 @@ env = { CAMPAIGN_TRACKER_DB = "/Users/derrick/Library/Application Support/campai
 | 写 | `update_campaign` | patch campaign / lines；未提到的现有 lines 会保留 |
 | 写 | `preview_import` | **只解析不写**：返回 sheet、列映射、缺失必填列、样本行；可指定 `sheet_name` |
 | 写 | `import_performance` | 真正导入业绩（按 line 删旧插新）；可指定 `sheet_name` |
+| 删 | `delete_campaign` | 删整个 campaign（级联 lines/flights/deals/performance）；两步确认 |
+| 删 | `delete_campaign_line` | 删单条 line 及其业绩（最后一条 line 拒删）；两步确认 |
+| 删 | `delete_performance` | 清空某 campaign 的业绩数据（保留结构）；两步确认 |
 
-> **没有 delete 工具**——AI 无删除权限，删除只能在应用界面手动操作。
+> **删除需两步确认**：调用删除工具会先返回预览 + 一次性 `confirm_token`；AI 必须把预览给你看、你点头后才带 token 二次调用执行。token 存内存、5 分钟过期、一次性、绑定具体操作和目标；每次真正删除前都会自动备份。
 
 ---
 
@@ -106,6 +109,17 @@ AI 流程：
 > 「Nike 这个 campaign 7 月的总展示量是多少？」
 
 AI 流程：`find_campaign` → `query_performance(campaign_id, from, to)` → 汇总返回。
+
+### D. 删除（两步确认）
+
+> 「把 Nike 那个 campaign 删掉。」
+
+AI 流程：
+1. `find_campaign("Nike")` 定位 campaign id
+2. `delete_campaign(id)`（不带 token）→ 拿到预览"将删 campaign 'Nike' 及 N 条 line、M 行业绩"和 `confirm_token`
+3. **把预览念给你听，等你确认**
+4. 你同意 → `delete_campaign(id, confirm_token)` 真正删除（删前自动备份）
+5. 返回删除结果 + 提示重启应用查看
 
 ---
 
