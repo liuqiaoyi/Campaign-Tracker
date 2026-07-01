@@ -77,7 +77,9 @@ env = { CAMPAIGN_TRACKER_DB = "/Users/derrick/Library/Application Support/campai
 | 删 | `delete_campaign_line` | 删单条 line 及其业绩（最后一条 line 拒删）；两步确认 |
 | 删 | `delete_performance` | 清空某 campaign 的业绩数据（保留结构）；两步确认 |
 
-> **删除需两步确认**：调用删除工具会先返回预览 + 一次性 `confirm_token`；AI 必须把预览给你看、你点头后才带 token 二次调用执行。token 存内存、5 分钟过期、一次性、绑定具体操作和目标；每次真正删除前都会自动备份。
+> **删除需两步确认**：调用删除工具会先返回预览 + 一次性 `confirm_token`；AI 应把预览给你看、你点头后才带 token 二次调用执行。token 存内存、5 分钟过期、一次性、绑定具体操作和目标，并带一个"将删除什么"的指纹（行数/条数）——两步之间数据若变了（比如又导入了业绩），执行会被拒绝、需重新预览。每次真正删除前都会自动备份。
+>
+> ⚠️ **这不是强制的人类审批**：MCP server 走 stdio、无法直接联系真人，两步 token 只保证"预览被取过且未过期失效"，是否把预览给你看依赖 AI 配合。真正的人类关卡是你的 MCP 客户端（Claude Code / Codex）调用工具时的权限提示。**不要对删除工具开 auto-approve**——让它们保持交互确认，这样 AI 的失误无法在你不知情时删数据。
 
 ---
 

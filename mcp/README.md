@@ -50,7 +50,9 @@ The read tools (`list_campaigns`, `get_campaign`, `find_campaign`, `query_perfor
 
 ### Deleting (two-step confirmation)
 
-Delete tools never act in one shot. Call the tool **without** `confirm_token` to get a human-readable `preview` plus a one-time `confirm_token`. The assistant must show the preview to you and get your explicit approval, then call the tool **again with** the `confirm_token` to execute. Tokens are held in memory, expire after 5 minutes, are single-use, and are bound to the exact operation and target. Every executed delete writes a `campaign-tracker-before-mcp-*.db` backup first.
+Delete tools never act in one shot. Call the tool **without** `confirm_token` to get a human-readable `preview` plus a one-time `confirm_token`. The assistant is instructed to show you the preview and get your approval, then call the tool **again with** the `confirm_token` to execute. Tokens are held in memory, expire after 5 minutes, are single-use, and are bound to the exact operation and target. The token also carries a fingerprint of what will be deleted (line/row counts); if the underlying data changes between preview and confirm (e.g. a new import lands), the execute call is rejected and you must re-preview. Every executed delete writes a `campaign-tracker-before-mcp-*.db` backup first.
+
+**This is not a hardened human-approval boundary.** The MCP server runs over stdio and cannot reach a human directly — the two-step token only guarantees that a preview was fetched and has not gone stale; it relies on the assistant to actually show it to you. The real human gate is your MCP client's own permission prompt (Claude Code / Codex ask before running a tool). **Do not auto-approve the delete tools** — keep them behind an interactive confirmation so a model mistake cannot delete without you.
 
 ## Client configuration
 
