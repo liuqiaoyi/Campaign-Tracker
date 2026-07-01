@@ -3,6 +3,8 @@ import * as path from 'path'
 import * as os from 'os'
 import * as fs from 'fs'
 import * as db from './db'
+// @ts-ignore - sql.js ships no bundled types
+import initSqlJs from 'sql.js'
 
 const wasmPath = path.join(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm')
 
@@ -102,14 +104,24 @@ describe('core/db', () => {
     expect(db.deleteCampaignLine(987654)).toBe(false)
   })
 
-  it('deleteCampaign leaves no orphan campaign_lines, performance_data, or campaign row', () => {
-    const c = db.createCampaign({ name: 'Orphan Co', client: 'O' } as any,
-      [{ channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any])
+  it('deleteCampaign leaves no orphan campaign_lines, performance_data, flights, deals, or campaign row', async () => {
+    const c = db.createCampaign({ name: 'Orphan Co', client: 'O' } as any, [
+      {
+        channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR',
+        flights: [{ flight_name: 'F1', start_date: '2026-07-01', end_date: '2026-07-15', budget: 1000 }],
+        deals: [{ deal_id: 'D1', deal_name: 'Deal One' }],
+      } as any,
+    ])
     const lineId = c.lines![0].id
     db.importPerformance(
       { campaign_id: c.id, campaign_line_id: lineId, file_path: '', keep_zero_impressions: false },
       [{ campaign_id: c.id, date: '2026-07-02', impressions: 999 } as any]
     )
+    // Sanity: flights and deals were actually seeded for this line.
+    const before = db.getCampaign(c.id)
+    expect(before?.lines?.[0].flights?.length).toBe(1)
+    expect(before?.lines?.[0].deals?.length).toBe(1)
+
     expect(db.deleteCampaign(c.id)).toBe(true)
     // Campaign row gone
     expect(db.getCampaign(c.id)).toBeUndefined()
@@ -117,5 +129,15 @@ describe('core/db', () => {
     expect(db.queryPerformance(c.id).length).toBe(0)
     // No orphan campaign_lines: getCampaignLineSummary must return undefined
     expect(db.getCampaignLineSummary(lineId)).toBeUndefined()
+
+    // No orphan flights/deals: query the on-disk file directly (scoped to this
+    // campaign so other tests sharing the DB do not affect the counts).
+    const SQL = await initSqlJs({ locateFile: () => wasmPath })
+    const raw = new SQL.Database(fs.readFileSync(dbPath))
+    const scopedCount = (table: string) =>
+      raw.exec(`SELECT COUNT(*) FROM ${table} WHERE campaign_id = ${c.id}`)[0].values[0][0] as number
+    expect(scopedCount('flights')).toBe(0)
+    expect(scopedCount('deals')).toBe(0)
+    raw.close()
   })
 })

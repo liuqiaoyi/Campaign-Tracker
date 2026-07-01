@@ -57,9 +57,11 @@ describe('mcp delete tools', () => {
     const lineId = c.lines![0].id
     const preview = deleteCampaignLineTool({ line_id: lineId }) as any
     expect(preview.requires_confirmation).toBe(true)
+    expect(backupCount()).toBe(0)                    // preview did not back up
     const done = deleteCampaignLineTool({ line_id: lineId, confirm_token: preview.confirm_token }) as any
     expect(done.deleted.type).toBe('campaign_line')
     expect(db.getCampaign(c.id)?.lines?.length).toBe(1)
+    expect(backupCount()).toBe(1)                    // execution backed up
   })
 
   it('delete_campaign_line refuses the last line at preview (no token issued)', () => {
@@ -78,10 +80,12 @@ describe('mcp delete tools', () => {
     const preview = deletePerformanceTool({ campaign_id: c.id }) as any
     expect(preview.requires_confirmation).toBe(true)
     expect(db.queryPerformance(c.id).length).toBe(1) // not cleared yet
+    expect(backupCount()).toBe(0)                    // preview did not back up
 
     const done = deletePerformanceTool({ campaign_id: c.id, confirm_token: preview.confirm_token }) as any
     expect(done.deleted.type).toBe('performance')
     expect(db.queryPerformance(c.id).length).toBe(0)
     expect(db.getCampaign(c.id)?.lines?.length).toBe(1) // structure kept
+    expect(backupCount()).toBe(1)                    // execution backed up
   })
 })
