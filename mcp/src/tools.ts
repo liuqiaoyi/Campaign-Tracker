@@ -128,11 +128,11 @@ export function deleteCampaignTool(args: { id: number; confirm_token?: string })
   if (!c) throw new Error(`Campaign ${args.id} not found`)
   if (!args.confirm_token) {
     const lineCount = c.lines?.length ?? 0
-    const perfRows = db.queryPerformance(args.id).length
+    const perfResults = db.queryPerformance(args.id)
     const lineIds = (c.lines ?? []).map(l => l.id)
-    const perfIds = db.queryPerformance(args.id).map(r => r.id)
+    const perfIds = perfResults.map(r => r.id)
     const fp = `${hashIds(lineIds)}:${hashIds(perfIds)}`
-    const preview = `Will DELETE campaign '${c.name}' (id ${args.id}) and its ${lineCount} line(s) and ${perfRows} performance row(s). Cascades; cannot be undone via MCP.`
+    const preview = `Will DELETE campaign '${c.name}' (id ${args.id}) and its ${lineCount} line(s) and ${perfResults.length} performance row(s). Cascades; cannot be undone via MCP.`
     return { preview, confirm_token: issueToken('campaign', args.id, preview, fp), requires_confirmation: true }
   }
   const current = db.getCampaign(args.id)
@@ -174,10 +174,10 @@ export function deletePerformanceTool(args: { campaign_id: number; confirm_token
   const c = db.getCampaign(args.campaign_id)
   if (!c) throw new Error(`Campaign ${args.campaign_id} not found`)
   if (!args.confirm_token) {
-    const perfRows = db.queryPerformance(args.campaign_id).length
-    const perfIds = db.queryPerformance(args.campaign_id).map(r => r.id)
+    const perfResults = db.queryPerformance(args.campaign_id)
+    const perfIds = perfResults.map(r => r.id)
     const fp = hashIds(perfIds)
-    const preview = `Will DELETE all ${perfRows} performance row(s) for campaign '${c.name}' (id ${args.campaign_id}). Campaign and line structure are kept.`
+    const preview = `Will DELETE all ${perfResults.length} performance row(s) for campaign '${c.name}' (id ${args.campaign_id}). Campaign and line structure are kept.`
     return { preview, confirm_token: issueToken('performance', args.campaign_id, preview, fp), requires_confirmation: true }
   }
   const perfIds = db.queryPerformance(args.campaign_id).map(r => r.id)

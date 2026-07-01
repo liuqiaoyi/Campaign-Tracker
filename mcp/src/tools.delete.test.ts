@@ -71,6 +71,23 @@ describe('mcp delete tools', () => {
     expect(db.queryPerformance(c.id).length).toBe(1)
   })
 
+  it('delete_campaign rejects stale token when a line is replaced 1:1 after preview', () => {
+    const c = db.createCampaign({ name: 'Swap Camp', client: 'S' } as any,
+      [{ channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any])
+    // Preview binds the single line's id into the fingerprint (1 line : 0 perf).
+    const preview = deleteCampaignTool({ id: c.id }) as any
+    expect(preview.requires_confirmation).toBe(true)
+
+    // Mutate: full-replace the line 1:1 — same line count, but a NEW line id.
+    db.updateCampaign(c.id, { name: 'Swap Camp' } as any,
+      [{ channel: 'Display', start_date: '2026-08-01', end_date: '2026-08-31', primary_kpi: 'VCR' } as any])
+
+    // Line-id set changed → content fingerprint changed → stale rejection (count-only would have missed this).
+    expect(() => deleteCampaignTool({ id: c.id, confirm_token: preview.confirm_token })).toThrow(/changed|stale/i)
+    expect(backupCount()).toBe(0)
+    expect(db.getCampaign(c.id)).toBeTruthy()
+  })
+
   it('delete_campaign_line deletes a non-last line with token', () => {
     const c = db.createCampaign({ name: 'Line Co', client: 'L' } as any, [
       { channel: 'CTV', start_date: '2026-07-01', end_date: '2026-07-31', primary_kpi: 'CTR' } as any,
